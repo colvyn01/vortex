@@ -507,13 +507,15 @@ def get_audio_player_html():
       <div class="audio-header-overlay">
         <div class="audio-title" id="audio-title">Loading...</div>
         <div class="audio-artist" id="audio-artist"></div>
-        <button class="audio-close" id="audio-close" aria-label="Minimize to dock">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M19 9l-7 7-7-7"/>
-          </svg>
-        </button>
       </div>
     </div>
+    
+    <!-- Minimize Button -->
+    <button class="audio-close" id="audio-close" aria-label="Minimize to dock">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 9l-7 7-7-7"/>
+      </svg>
+    </button>
 
     <!-- LED VU Meter Visualizer (14 bars, logarithmic frequency mapping) -->
     <!-- Design Decision: 14 rectangular LED segments (not 12/16, not rounded).
@@ -586,14 +588,7 @@ def get_audio_player_html():
         <span id="audio-volume-val">80%</span>
       </div>
 
-      <!-- Pitch Shift -->
-      <div class="audio-control-group">
-        <label for="audio-pitch">PITCH</label>
-        <input type="range" id="audio-pitch" min="-12" max="12" value="0" step="1">
-        <span id="audio-pitch-val">0</span>
-      </div>
-
-      <!-- Tempo -->
+      <!-- Tempo (affects both speed and pitch naturally) -->
       <div class="audio-control-group">
         <label for="audio-tempo">TEMPO</label>
         <input type="range" id="audio-tempo" min="50" max="200" value="100" step="1">
@@ -794,8 +789,8 @@ html {
 
 .audio-close {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
+  top: 1rem;
+  right: 1rem;
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
@@ -1594,8 +1589,14 @@ def get_audio_player_js():
   const PEAK_HOLD_TIME = 100;  // ms before peak decay starts
   const PEAK_DECAY_TIME = 150;  // ms for full peak decay
 
-  // Pre-computed pitch shift lookup table
-  const PITCH_LUT = Array.from({length: 25}, (_, i) => Math.pow(2, (i - 12) / 12));
+  // ========================================
+  // TEMPO CONTROL EXPLANATION
+  // ========================================
+  // Tempo uses HTMLAudioElement's playbackRate, which naturally affects
+  // both speed AND pitch (like playing a vinyl record faster/slower).
+  // - 100% = normal playback
+  // - 150% = 1.5x faster (higher pitch)
+  // -  50% = 0.5x slower (lower pitch)
 
   // Logarithmic frequency mapping for 14 VU bars (20Hz - 20kHz)
   // Design Decision: Logarithmic scale (not linear).
@@ -1616,6 +1617,9 @@ def get_audio_player_js():
   let midNode = null;
   let trebleNode = null;
   let analyserNode = null;
+  
+  // Tempo control
+  let currentTempo = 1.0;     // playback rate (1.0 = normal)
 
   const freqData = new Uint8Array(FFT_SIZE / 2);
   const vuPeaks = new Float32Array(VU_BARS);  // Peak hold values
@@ -1654,8 +1658,6 @@ def get_audio_player_js():
   const timeTotal = document.getElementById('audio-time-total');
   const volumeSlider = document.getElementById('audio-volume');
   const volumeVal = document.getElementById('audio-volume-val');
-  const pitchSlider = document.getElementById('audio-pitch');
-  const pitchVal = document.getElementById('audio-pitch-val');
   const tempoSlider = document.getElementById('audio-tempo');
   const tempoVal = document.getElementById('audio-tempo-val');
   const bassSlider = document.getElementById('audio-bass');
@@ -1741,6 +1743,9 @@ def get_audio_player_js():
     midNode.Q.value = 1;
     trebleNode.type = 'highshelf';
     trebleNode.frequency.value = 3000;
+    
+    // Initialize tempo state
+    currentTempo = 1.0;
   }
 
   function connectAudioNodes() {
@@ -1757,6 +1762,14 @@ def get_audio_player_js():
       .connect(analyserNode)
       .connect(audioContext.destination);
   }
+  
+  /**
+   * Calculate playback rate for pitch and tempo control.
+   * Since we can't truly separate pitch from tempo with basic playbackRate,
+   * we apply both multiplicatively: pitch shifts will also affect tempo.
+   */
+  function updatePlaybackRate() {
+    console.log(`[updatePlaybackRate] currentPitchShift: ${currentPitchShift}, currentTempo: ${currentTempo}`);\n    console.log(`[updatePlaybackRate] PITCH_LUT length: ${PITCH_LUT.length}`);\n    console.log(`[updatePlaybackRate] Accessing PITCH_LUT[${currentPitchShift + 12}]`);\n    \n    const pitchRate = PITCH_LUT[currentPitchShift + 12];\n    console.log(`[updatePlaybackRate] pitchRate: ${pitchRate}`);\n    \n    const combinedRate = currentTempo * pitchRate;\n    console.log(`[updatePlaybackRate] Pitch: ${currentPitchShift} semitones (${pitchRate.toFixed(3)}x), Tempo: ${(currentTempo * 100).toFixed(0)}%, Combined: ${combinedRate.toFixed(3)}x`);\n    \n    // Clamp to valid range (0.25x to 4x)\n    const finalRate = Math.max(0.25, Math.min(4.0, combinedRate));\n    console.log(`[updatePlaybackRate] Setting audio.playbackRate to: ${finalRate}`);\n    audio.playbackRate = finalRate;\n    console.log(`[updatePlaybackRate] audio.playbackRate is now: ${audio.playbackRate}`);\n  }
 
   // ========================================
   // LED VU METER VISUALIZER (60fps)
@@ -1862,6 +1875,11 @@ def get_audio_player_js():
   function playTrack(index) {
     if (index < 0 || index >= currentPlaylist.length) return;
 
+    // Initialize audio context before first play
+    if (!audioContext) {
+      initAudioContext();
+    }
+
     currentTrackIndex = index;
     const track = currentPlaylist[index];
 
@@ -1891,9 +1909,23 @@ def get_audio_player_js():
 
   function togglePlayPause() {
     if (audio.paused) {
-      audio.play();
-      updatePlayPauseIcons(false);
-      startVUMeter();
+      // Initialize audio context before first play
+      if (!audioContext) {
+        initAudioContext();
+      }
+      
+      audio.play().then(() => {
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        if (!audioSource) {
+          connectAudioNodes();
+        }
+        updatePlayPauseIcons(false);
+        startVUMeter();
+      }).catch(err => {
+        console.error('Playback failed:', err);
+      });
     } else {
       audio.pause();
       updatePlayPauseIcons(true);
@@ -1973,18 +2005,17 @@ def get_audio_player_js():
       miniVolume.value = volume;
       updateVolume(volume);
 
-      pitchSlider.value = 0;
       tempoSlider.value = 100;
       bassSlider.value = 0;
       midSlider.value = 0;
       trebleSlider.value = 0;
 
+      currentTempo = 1.0;
       audio.playbackRate = 1;
       bassNode.gain.value = 0;
       midNode.gain.value = 0;
       trebleNode.gain.value = 0;
 
-      pitchVal.textContent = '0';
       tempoVal.textContent = '100%';
       bassVal.textContent = '0';
       midVal.textContent = '0';
@@ -2003,26 +2034,28 @@ def get_audio_player_js():
         // File not in playlist, play directly
         audio.src = fileUrl;
         loadAlbumArt(fileUrl);
-        audio.play();
-        if (!audioSource) {
-          connectAudioNodes();
-        }
-        startVUMeter();
+        audio.play().then(() => {
+          if (audioContext.state === 'suspended') {
+            audioContext.resume();
+          }
+          if (!audioSource) {
+            connectAudioNodes();
+          }
+          updatePlayPauseIcons(false);
+          startVUMeter();
+        }).catch(err => {
+          console.error('Playback failed:', err);
+        });
       }
     });
   }
 
   function minimizePlayer() {
-    if (!audio.paused) {
-      // Audio continues playing
-      playerState = 'mini';
-      modal.style.display = 'none';
-      miniPlayer.style.display = 'flex';
-      document.body.classList.add('mini-player-active');
-    } else {
-      // If paused, fully dismiss
-      dismissPlayer();
-    }
+    // Always show mini-player, even when paused
+    playerState = 'mini';
+    modal.style.display = 'none';
+    miniPlayer.style.display = 'flex';
+    document.body.classList.add('mini-player-active');
   }
 
   function expandPlayer() {
@@ -2085,34 +2118,30 @@ def get_audio_player_js():
     localStorage.setItem('vortex-audio-volume', value);
   }, SLIDER_DEBOUNCE);
 
-  const updatePitch = debounce((semitones) => {
-    const tempo = parseInt(tempoSlider.value);
-    const tempoRate = tempo / 100;
-    const pitchRate = PITCH_LUT[parseInt(semitones) + 12];
-    audio.playbackRate = tempoRate * pitchRate;
-    pitchVal.textContent = (semitones > 0 ? '+' : '') + semitones;
-  }, SLIDER_DEBOUNCE);
-
   const updateTempo = debounce((tempo) => {
-    const semitones = parseInt(pitchSlider.value);
-    const tempoRate = tempo / 100;
-    const pitchRate = PITCH_LUT[semitones + 12];
-    audio.playbackRate = tempoRate * pitchRate;
+    currentTempo = tempo / 100;
+    audio.playbackRate = Math.max(0.25, Math.min(4.0, currentTempo));
     tempoVal.textContent = tempo + '%';
   }, SLIDER_DEBOUNCE);
 
   const updateBass = debounce((gain) => {
-    bassNode.gain.value = gain;
+    if (bassNode && bassNode.gain) {
+      bassNode.gain.value = gain;
+    }
     bassVal.textContent = (gain > 0 ? '+' : '') + gain;
   }, SLIDER_DEBOUNCE);
 
   const updateMid = debounce((gain) => {
-    midNode.gain.value = gain;
+    if (midNode && midNode.gain) {
+      midNode.gain.value = gain;
+    }
     midVal.textContent = (gain > 0 ? '+' : '') + gain;
   }, SLIDER_DEBOUNCE);
 
   const updateTreble = debounce((gain) => {
-    trebleNode.gain.value = gain;
+    if (trebleNode && trebleNode.gain) {
+      trebleNode.gain.value = gain;
+    }
     trebleVal.textContent = (gain > 0 ? '+' : '') + gain;
   }, SLIDER_DEBOUNCE);
 
@@ -2209,7 +2238,6 @@ def get_audio_player_js():
   // Sliders
   volumeSlider.addEventListener('input', (e) => updateVolume(e.target.value));
   miniVolume.addEventListener('input', (e) => updateVolume(e.target.value));
-  pitchSlider.addEventListener('input', (e) => updatePitch(e.target.value));
   tempoSlider.addEventListener('input', (e) => updateTempo(e.target.value));
   bassSlider.addEventListener('input', (e) => updateBass(e.target.value));
   midSlider.addEventListener('input', (e) => updateMid(e.target.value));
