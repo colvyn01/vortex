@@ -95,10 +95,6 @@ def render_layout(title: str, body_html: str) -> str:
         <p>Local file gateway</p>
       </header>
       {body_html}
-      <footer class="device-footer">
-        <span class="label">Status</span>
-        <span class="value">Listening...</span>
-      </footer>
     </div>
   </div>
 <script>{_COMPLETE_SCRIPTS}</script>

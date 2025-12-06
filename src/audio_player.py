@@ -52,22 +52,22 @@ def _hash_color(text: str, index: int) -> str:
 def generate_placeholder_svg(filename: str) -> str:
     """
     Generate deterministic gradient SVG placeholder with music note icon.
-    
+
     Design Decision: Hash-based gradient (not solid color or generic icon).
     Rationale: Deterministic hashing creates visual variety (each file gets unique
     gradient) without randomness that would change on reload. Gradient provides
     depth without complexity. Music note icon anchors the design.
-    
+
     Args:
         filename: Original filename (used for hash seed)
-        
+
     Returns:
         Base64-encoded SVG data URI
     """
     color1 = _hash_color(filename, 0)
     color2 = _hash_color(filename, 1)
-    
-    svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+
+    svg = f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
   <defs>
     <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:{color1};stop-opacity:1" />
@@ -77,8 +77,8 @@ def generate_placeholder_svg(filename: str) -> str:
   <rect width="300" height="300" fill="url(#grad)"/>
   <path d="M150 80 L150 200 M150 200 Q165 210 165 220 Q165 230 150 230 Q135 230 135 220 Q135 210 150 200 M190 70 L190 180 M190 180 Q205 190 205 200 Q205 210 190 210 Q175 210 175 200 Q175 190 190 180 M150 80 L190 70" 
         fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.9)" stroke-width="3"/>
-</svg>'''
-    
+</svg>"""
+
     svg_base64 = base64.b64encode(svg.encode()).decode()
     return f"data:image/svg+xml;base64,{svg_base64}"
 
@@ -86,14 +86,14 @@ def generate_placeholder_svg(filename: str) -> str:
 def extract_id3v2_metadata(file_path: str) -> Dict:
     """
     Extract ID3v2 metadata from MP3 files using pure Python struct parsing.
-    
+
     Design Decision: Parse only TIT2/TPE1/TALB/APIC (title/artist/album/artwork).
     Rationale: UI displays only these 4 fields. Extended metadata (TDRC date, TCON genre)
     would add 40% parsing overhead with zero UI benefit.
-    
+
     Args:
         file_path: Absolute path to MP3 file
-        
+
     Returns:
         Dict with keys: title, artist, album, artwork_base64, has_artwork
     """
@@ -102,68 +102,76 @@ def extract_id3v2_metadata(file_path: str) -> Dict:
         "artist": None,
         "album": None,
         "artwork_base64": None,
-        "has_artwork": False
+        "has_artwork": False,
     }
-    
+
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Read ID3v2 header (10 bytes)
             header = f.read(10)
-            if len(header) < 10 or header[:3] != b'ID3':
+            if len(header) < 10 or header[:3] != b"ID3":
                 return metadata
-            
+
             # Parse ID3v2 version and size
             version = header[3]
             if version not in (3, 4):  # Only support ID3v2.3 and ID3v2.4
                 return metadata
-            
+
             # ID3v2 size (syncsafe integer - 7 bits per byte)
-            size = ((header[6] & 0x7F) << 21 | (header[7] & 0x7F) << 14 |
-                    (header[8] & 0x7F) << 7 | (header[9] & 0x7F))
-            
+            size = (
+                (header[6] & 0x7F) << 21
+                | (header[7] & 0x7F) << 14
+                | (header[8] & 0x7F) << 7
+                | (header[9] & 0x7F)
+            )
+
             # Read all frames
             tag_data = f.read(size)
             pos = 0
-            
+
             while pos < len(tag_data) - 10:
                 # Read frame header (10 bytes)
-                frame_id = tag_data[pos:pos+4].decode('latin1', errors='ignore')
-                if frame_id[0] == '\x00':  # Padding reached
+                frame_id = tag_data[pos : pos + 4].decode("latin1", errors="ignore")
+                if frame_id[0] == "\x00":  # Padding reached
                     break
-                
+
                 # Frame size
                 if version == 4:
                     # ID3v2.4 uses syncsafe integers for frame size
-                    frame_size = ((tag_data[pos+4] & 0x7F) << 21 | (tag_data[pos+5] & 0x7F) << 14 |
-                                  (tag_data[pos+6] & 0x7F) << 7 | (tag_data[pos+7] & 0x7F))
+                    frame_size = (
+                        (tag_data[pos + 4] & 0x7F) << 21
+                        | (tag_data[pos + 5] & 0x7F) << 14
+                        | (tag_data[pos + 6] & 0x7F) << 7
+                        | (tag_data[pos + 7] & 0x7F)
+                    )
                 else:
                     # ID3v2.3 uses regular big-endian integers
-                    frame_size = struct.unpack('>I', tag_data[pos+4:pos+8])[0]
-                
+                    frame_size = struct.unpack(">I", tag_data[pos + 4 : pos + 8])[0]
+
                 pos += 10  # Skip frame header
-                
+
                 if frame_size <= 0 or pos + frame_size > len(tag_data):
                     break
-                
-                frame_data = tag_data[pos:pos+frame_size]
+
+                frame_data = tag_data[pos : pos + frame_size]
                 pos += frame_size
-                
+
                 # Parse only essential frames for UI display
-                if frame_id == 'TIT2':  # Title
-                    metadata['title'] = _decode_text_frame(frame_data)
-                elif frame_id == 'TPE1':  # Artist
-                    metadata['artist'] = _decode_text_frame(frame_data)
-                elif frame_id == 'TALB':  # Album
-                    metadata['album'] = _decode_text_frame(frame_data)
-                elif frame_id == 'APIC':  # Attached picture
+                if frame_id == "TIT2":  # Title
+                    metadata["title"] = _decode_text_frame(frame_data)
+                elif frame_id == "TPE1":  # Artist
+                    metadata["artist"] = _decode_text_frame(frame_data)
+                elif frame_id == "TALB":  # Album
+                    metadata["album"] = _decode_text_frame(frame_data)
+                elif frame_id == "APIC":  # Attached picture
                     artwork = _decode_apic_frame(frame_data)
                     if artwork:
-                        metadata['artwork_base64'] = artwork
-                        metadata['has_artwork'] = True
-    
+                        metadata["artwork_base64"] = artwork
+                        metadata["has_artwork"] = True
+
     except Exception:
         pass  # Return partial metadata on error
-    
+
     return metadata
 
 
@@ -171,22 +179,22 @@ def _decode_text_frame(data: bytes) -> Optional[str]:
     """Decode ID3v2 text frame with encoding byte."""
     if len(data) < 2:
         return None
-    
+
     encoding = data[0]
     text_data = data[1:]
-    
+
     try:
         if encoding == 0:  # ISO-8859-1
-            return text_data.rstrip(b'\x00').decode('latin1')
+            return text_data.rstrip(b"\x00").decode("latin1")
         elif encoding == 1:  # UTF-16 with BOM
-            return text_data.rstrip(b'\x00').decode('utf-16')
+            return text_data.rstrip(b"\x00").decode("utf-16")
         elif encoding == 2:  # UTF-16BE
-            return text_data.rstrip(b'\x00').decode('utf-16-be')
+            return text_data.rstrip(b"\x00").decode("utf-16-be")
         elif encoding == 3:  # UTF-8
-            return text_data.rstrip(b'\x00').decode('utf-8')
+            return text_data.rstrip(b"\x00").decode("utf-8")
     except Exception:
         return None
-    
+
     return None
 
 
@@ -194,45 +202,45 @@ def _decode_apic_frame(data: bytes) -> Optional[str]:
     """Decode ID3v2 APIC (Attached Picture) frame to base64."""
     if len(data) < 10:
         return None
-    
+
     try:
         encoding = data[0]
         pos = 1
-        
+
         # Read MIME type (null-terminated)
-        mime_end = data.find(b'\x00', pos)
+        mime_end = data.find(b"\x00", pos)
         if mime_end == -1:
             return None
-        mime_type = data[pos:mime_end].decode('latin1')
+        mime_type = data[pos:mime_end].decode("latin1")
         pos = mime_end + 1
-        
+
         # Skip picture type byte
         pos += 1
-        
+
         # Skip description (null-terminated based on encoding)
         if encoding == 0 or encoding == 3:  # Latin1 or UTF-8
-            desc_end = data.find(b'\x00', pos)
+            desc_end = data.find(b"\x00", pos)
         else:  # UTF-16
-            desc_end = data.find(b'\x00\x00', pos)
-        
+            desc_end = data.find(b"\x00\x00", pos)
+
         if desc_end == -1:
             return None
         pos = desc_end + (2 if encoding != 0 and encoding != 3 else 1)
-        
+
         # Remaining data is the image
         image_data = data[pos:]
         if len(image_data) < 100:  # Sanity check for minimum image size
             return None
-        
+
         # Detect actual MIME type from magic bytes if needed
-        if image_data[:2] == b'\xFF\xD8':
-            mime_type = 'image/jpeg'
-        elif image_data[:8] == b'\x89PNG\r\n\x1a\n':
-            mime_type = 'image/png'
-        
+        if image_data[:2] == b"\xff\xd8":
+            mime_type = "image/jpeg"
+        elif image_data[:8] == b"\x89PNG\r\n\x1a\n":
+            mime_type = "image/png"
+
         img_base64 = base64.b64encode(image_data).decode()
         return f"data:{mime_type};base64,{img_base64}"
-    
+
     except Exception:
         return None
 
@@ -240,12 +248,12 @@ def _decode_apic_frame(data: bytes) -> Optional[str]:
 def extract_m4a_metadata(file_path: str) -> Dict:
     """
     Extract metadata from M4A/MP4 audio files using atom parsing.
-    
+
     Parses covr (artwork), ©nam (title), ©ART (artist), ©alb (album) atoms.
-    
+
     Args:
         file_path: Absolute path to M4A file
-        
+
     Returns:
         Dict with keys: title, artist, album, artwork_base64, has_artwork
     """
@@ -254,21 +262,21 @@ def extract_m4a_metadata(file_path: str) -> Dict:
         "artist": None,
         "album": None,
         "artwork_base64": None,
-        "has_artwork": False
+        "has_artwork": False,
     }
-    
+
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             # Find 'moov' atom containing metadata
             while True:
                 atom_header = f.read(8)
                 if len(atom_header) < 8:
                     break
-                
-                atom_size = struct.unpack('>I', atom_header[:4])[0]
+
+                atom_size = struct.unpack(">I", atom_header[:4])[0]
                 atom_type = atom_header[4:8]
-                
-                if atom_type == b'moov':
+
+                if atom_type == b"moov":
                     moov_data = f.read(atom_size - 8)
                     _parse_moov_atom(moov_data, metadata)
                     break
@@ -276,10 +284,10 @@ def extract_m4a_metadata(file_path: str) -> Dict:
                     f.seek(atom_size - 8, 1)  # Skip to next atom
                 else:
                     break
-    
+
     except Exception:
         pass  # Return partial metadata on error
-    
+
     return metadata
 
 
@@ -289,17 +297,17 @@ def _parse_moov_atom(data: bytes, metadata: Dict):
     while pos < len(data) - 8:
         if pos + 8 > len(data):
             break
-        
-        atom_size = struct.unpack('>I', data[pos:pos+4])[0]
-        atom_type = data[pos+4:pos+8]
-        
+
+        atom_size = struct.unpack(">I", data[pos : pos + 4])[0]
+        atom_type = data[pos + 4 : pos + 8]
+
         if atom_size < 8:
             break
-        
-        if atom_type == b'udta':
+
+        if atom_type == b"udta":
             # Parse user data atom
-            _parse_udta_atom(data[pos+8:pos+atom_size], metadata)
-        
+            _parse_udta_atom(data[pos + 8 : pos + atom_size], metadata)
+
         pos += atom_size
 
 
@@ -309,17 +317,17 @@ def _parse_udta_atom(data: bytes, metadata: Dict):
     while pos < len(data) - 8:
         if pos + 8 > len(data):
             break
-        
-        atom_size = struct.unpack('>I', data[pos:pos+4])[0]
-        atom_type = data[pos+4:pos+8]
-        
+
+        atom_size = struct.unpack(">I", data[pos : pos + 4])[0]
+        atom_type = data[pos + 4 : pos + 8]
+
         if atom_size < 8:
             break
-        
-        if atom_type == b'meta':
+
+        if atom_type == b"meta":
             # Skip version/flags (4 bytes) and parse ilst
-            _parse_ilst_atom(data[pos+12:pos+atom_size], metadata)
-        
+            _parse_ilst_atom(data[pos + 12 : pos + atom_size], metadata)
+
         pos += atom_size
 
 
@@ -329,59 +337,65 @@ def _parse_ilst_atom(data: bytes, metadata: Dict):
     while pos < len(data) - 8:
         if pos + 8 > len(data):
             break
-        
-        atom_size = struct.unpack('>I', data[pos:pos+4])[0]
-        atom_type = data[pos+4:pos+8]
-        
+
+        atom_size = struct.unpack(">I", data[pos : pos + 4])[0]
+        atom_type = data[pos + 4 : pos + 8]
+
         if atom_size < 8:
             break
-        
-        atom_data = data[pos+8:pos+atom_size]
-        
+
+        atom_data = data[pos + 8 : pos + atom_size]
+
         # Parse metadata atoms (skip 'data' wrapper - 16 bytes header)
         if len(atom_data) > 16:
             value_data = atom_data[16:]
-            
-            if atom_type == b'\xa9nam':  # Title
+
+            if atom_type == b"\xa9nam":  # Title
                 try:
-                    metadata['title'] = value_data.decode('utf-8', errors='ignore').rstrip('\x00')
+                    metadata["title"] = value_data.decode(
+                        "utf-8", errors="ignore"
+                    ).rstrip("\x00")
                 except:
                     pass
-            elif atom_type == b'\xa9ART':  # Artist
+            elif atom_type == b"\xa9ART":  # Artist
                 try:
-                    metadata['artist'] = value_data.decode('utf-8', errors='ignore').rstrip('\x00')
+                    metadata["artist"] = value_data.decode(
+                        "utf-8", errors="ignore"
+                    ).rstrip("\x00")
                 except:
                     pass
-            elif atom_type == b'\xa9alb':  # Album
+            elif atom_type == b"\xa9alb":  # Album
                 try:
-                    metadata['album'] = value_data.decode('utf-8', errors='ignore').rstrip('\x00')
+                    metadata["album"] = value_data.decode(
+                        "utf-8", errors="ignore"
+                    ).rstrip("\x00")
                 except:
                     pass
-            elif atom_type == b'covr':  # Cover artwork
+            elif atom_type == b"covr":  # Cover artwork
                 # Detect image type from magic bytes
-                mime_type = 'image/jpeg'
-                if value_data[:8] == b'\x89PNG\r\n\x1a\n':
-                    mime_type = 'image/png'
-                
+                mime_type = "image/jpeg"
+                if value_data[:8] == b"\x89PNG\r\n\x1a\n":
+                    mime_type = "image/png"
+
                 img_base64 = base64.b64encode(value_data).decode()
-                metadata['artwork_base64'] = f"data:{mime_type};base64,{img_base64}"
-                metadata['has_artwork'] = True
-        
+                metadata["artwork_base64"] = f"data:{mime_type};base64,{img_base64}"
+                metadata["has_artwork"] = True
+
         pos += atom_size
 
 
 def get_audio_metadata(file_path: str) -> Dict:
     """
     Get audio metadata with LRU caching.
-    
+
     Design Decision: On-demand endpoint with LRU cache (not pre-scan).
     Rationale: Pre-scanning entire directory delays initial page load and wastes
     memory on files never played. On-demand caching hits 90%+ for typical listening
     patterns (repeat plays, adjacent tracks). 50 entries = ~2MB memory (negligible).
-    
+
     Args:
         file_path: Absolute path to audio file
-        
+
     Returns:
         Dict with: title, artist, album, artwork_base64, has_artwork, placeholder
     """
@@ -391,13 +405,13 @@ def get_audio_metadata(file_path: str) -> Dict:
         _cache_order.remove(file_path)
         _cache_order.append(file_path)
         return _metadata_cache[file_path]
-    
+
     # Extract metadata based on file extension
     ext = os.path.splitext(file_path)[1].lower()
-    
-    if ext == '.mp3':
+
+    if ext == ".mp3":
         metadata = extract_id3v2_metadata(file_path)
-    elif ext in ('.m4a', '.m4b', '.m4p', '.m4r'):
+    elif ext in (".m4a", ".m4b", ".m4p", ".m4r"):
         metadata = extract_m4a_metadata(file_path)
     else:
         # Unsupported format - return empty metadata
@@ -406,30 +420,30 @@ def get_audio_metadata(file_path: str) -> Dict:
             "artist": None,
             "album": None,
             "artwork_base64": None,
-            "has_artwork": False
+            "has_artwork": False,
         }
-    
+
     # Generate placeholder if no artwork found
     filename = os.path.basename(file_path)
-    if not metadata['has_artwork']:
-        metadata['artwork_base64'] = generate_placeholder_svg(filename)
-    
+    if not metadata["has_artwork"]:
+        metadata["artwork_base64"] = generate_placeholder_svg(filename)
+
     # Use filename as title fallback
-    if not metadata['title']:
-        metadata['title'] = os.path.splitext(filename)[0]
-    
+    if not metadata["title"]:
+        metadata["title"] = os.path.splitext(filename)[0]
+
     # Cache and evict if necessary
     _metadata_cache[file_path] = metadata
     _cache_order.append(file_path)
     _evict_cache()
-    
+
     return metadata
 
 
 def get_audio_player_html():
     """
     Returns dual-mode DOM structure for audio player (full modal + mini dock).
-    
+
     Design principles:
     - Persistent audio element (never destroyed - critical for iOS Safari)
     - Dual-mode UI: full modal with album art + VU meter, mini dock with thumbnail
@@ -613,11 +627,22 @@ def get_audio_player_html():
   </div>
 </div>
 
-<!-- Global style for body padding when mini-player active -->
+<!-- Global style for container padding when mini-player active -->
 <style id="mini-player-styles">
-  .mini-player-active {
-    padding-bottom: 80px !important;
-    transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Desktop: Add padding to device-shell to prevent content clipping */
+  @media (min-width: 900px) {
+    body.mini-player-active .device-shell {
+      padding-bottom: 80px !important;
+      transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+  }
+  
+  /* Mobile: Add padding to body for full-width mini-player */
+  @media (max-width: 899px) {
+    body.mini-player-active {
+      padding-bottom: 80px !important;
+      transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
   }
 </style>
 """
@@ -626,9 +651,9 @@ def get_audio_player_html():
 def get_audio_player_css():
     """
     Returns hardware-aesthetic CSS with LED VU meter and dual-mode player.
-    
+
     Design aesthetic: 1980s cassette deck meets TE retrofuturistic minimal.
-    
+
     Performance optimizations:
     - GPU-accelerated transitions (transform/opacity only)
     - will-change for layer promotion
@@ -636,6 +661,25 @@ def get_audio_player_css():
     - CSS Grid for static layouts
     """
     return """
+/* ========================================
+   GLOBAL SCROLLBAR HIDING
+   ======================================== */
+
+/* Hide scrollbars but keep functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari/Opera */
+}
+
+/* Ensure smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
 /* ========================================
    FULL AUDIO PLAYER MODAL
    ======================================== */
@@ -660,8 +704,8 @@ def get_audio_player_css():
   padding: 2rem;
   background: var(--surface-color);
   /* Hardware cassette deck beveled border effect */
-  border: 3px solid var(--border-color);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
   box-shadow: 
     0 20px 60px rgba(0, 0, 0, 0.4),
     inset 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -676,11 +720,11 @@ def get_audio_player_css():
   width: 300px;
   height: 300px;
   margin: 0 auto 2rem;
-  border: 3px solid var(--border-color);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   overflow: hidden;
   background: var(--bg-color);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
 }
 
 .album-art {
@@ -706,7 +750,7 @@ def get_audio_player_css():
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-top-color: white;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -753,7 +797,7 @@ def get_audio_player_css():
   top: 0.5rem;
   right: 0.5rem;
   background: rgba(0, 0, 0, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -790,8 +834,8 @@ def get_audio_player_css():
   height: 120px;
   padding: 1rem;
   background: rgba(0, 0, 0, 0.85);
-  border: 3px solid var(--border-color);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   margin-bottom: 1.5rem;
   box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
 }
@@ -801,7 +845,7 @@ def get_audio_player_css():
   height: 100%;
   position: relative;
   background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  border-radius: 4px;
   transition: opacity 0.05s linear;
   will-change: opacity;
   contain: strict;
@@ -899,7 +943,7 @@ def get_audio_player_css():
   height: 8px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color);
-  border-radius: 4px;
+  border-radius: 8px;
   outline: none;
   cursor: pointer;
 }
@@ -910,7 +954,7 @@ def get_audio_player_css():
   width: 20px;
   height: 20px;
   background: var(--accent-color);
-  border: 2px solid var(--accent-hover);
+  border: 1px solid var(--accent-hover);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -929,7 +973,7 @@ def get_audio_player_css():
   width: 20px;
   height: 20px;
   background: var(--accent-color);
-  border: 2px solid var(--accent-hover);
+  border: 1px solid var(--accent-hover);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -955,7 +999,7 @@ def get_audio_player_css():
 .audio-btn {
   background: var(--surface-alt);
   /* Physical button: raised effect with shadow */
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   box-shadow: 
     0 3px 0 rgba(0, 0, 0, 0.25),
@@ -998,7 +1042,7 @@ def get_audio_player_css():
 
 .audio-play-btn {
   background: var(--accent-color);
-  border: 2px solid var(--accent-hover);
+  border: 1px solid var(--accent-hover);
   border-radius: 50%;
   box-shadow: 
     0 4px 0 rgba(0, 0, 0, 0.3),
@@ -1040,8 +1084,8 @@ def get_audio_player_css():
   margin-bottom: 2rem;
   padding: 1.5rem;
   background: rgba(0, 0, 0, 0.05);
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -1067,7 +1111,7 @@ def get_audio_player_css():
   height: 6px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-light);
-  border-radius: 3px;
+  border-radius: 6px;
   outline: none;
   cursor: pointer;
 }
@@ -1078,7 +1122,7 @@ def get_audio_player_css():
   width: 16px;
   height: 16px;
   background: var(--secondary-accent);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -1088,7 +1132,7 @@ def get_audio_player_css():
   width: 16px;
   height: 16px;
   background: var(--secondary-accent);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
@@ -1105,6 +1149,61 @@ def get_audio_player_css():
 }
 
 /* ========================================
+   FULL PLAYER FOCUS STATES (Remove Blue Glow)
+   ======================================== */
+
+/* Remove default browser focus outlines */
+.audio-modal input:focus,
+.audio-modal button:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Accessible keyboard navigation */
+.audio-btn:focus-visible,
+.audio-play-btn:focus-visible,
+.audio-close:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+/* Progress bar focus - thumb highlight only */
+.audio-progress-bar:focus {
+  outline: none;
+}
+
+.audio-progress-bar:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px rgba(0, 121, 107, 0.3);
+  transform: scale(1.15);
+}
+
+.audio-progress-bar:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px rgba(0, 121, 107, 0.3);
+  transform: scale(1.15);
+}
+
+/* Advanced control sliders focus */
+.audio-control-group input[type="range"]:focus {
+  outline: none;
+}
+
+.audio-control-group input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(216, 67, 21, 0.3);
+  transform: scale(1.15);
+}
+
+.audio-control-group input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(216, 67, 21, 0.3);
+  transform: scale(1.15);
+}
+
+/* Remove webkit tap highlight */
+.audio-modal input,
+.audio-modal button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ========================================
    PLAYLIST
    ======================================== */
 
@@ -1112,8 +1211,8 @@ def get_audio_player_css():
   max-height: 200px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.05);
-  border: 2px solid var(--border-light);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
   contain: layout style;
   -webkit-overflow-scrolling: touch;
 }
@@ -1148,36 +1247,55 @@ def get_audio_player_css():
    Design Decision: Hide visualizer in mini mode.
    Rationale: 64px height insufficient for meaningful
    display, battery savings prioritized over non-functional decoration.
+   
+   Desktop (≥900px): Centered within app-root bounds, respects device-shell aesthetic.
+   Mobile (<900px): Full-width with safe-area-inset for notch/home indicator.
    ======================================== */
 
 .mini-player {
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  bottom: 1.5rem; /* Match app-root desktop padding */
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 800px;
+  width: calc(100% - 3rem); /* Account for app-root padding (1.5rem × 2) */
   height: 64px;
-  background: var(--surface-color);
-  border-top: 3px solid var(--border-color);
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+  /* Glassmorphism effect - theme colors only, no saturation boost */
+  background: rgba(232, 244, 241, 0.85); /* Cool off-white/teal tint */
+  backdrop-filter: blur(12px); /* Remove saturate() to fix blue shift */
+  -webkit-backdrop-filter: blur(12px); /* Safari support */
+  border: 1px solid rgba(0, 121, 107, 0.2); /* Translucent teal border */
+  border-top: 1px solid rgba(0, 121, 107, 0.3); /* Slightly stronger top border */
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12); /* Pure black shadow only */
   z-index: 9999;
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 1rem;
-  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
   contain: layout;
 }
 
+/* Fallback for browsers without backdrop-filter support */
+@supports not (backdrop-filter: blur(10px)) {
+  .mini-player {
+    background: rgba(255, 251, 247, 0.96); /* More opaque fallback */
+  }
+}
+
 .mini-art {
   width: 48px;
   height: 48px;
-  border-radius: 4px;
-  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
   object-fit: cover;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  /* Enhanced shadow for contrast against translucent background */
+  box-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .mini-info {
@@ -1219,7 +1337,7 @@ def get_audio_player_css():
 
 .mini-btn {
   background: var(--surface-alt);
-  border: 2px solid var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 50%;
   width: 36px;
   height: 36px;
@@ -1261,9 +1379,9 @@ def get_audio_player_css():
   appearance: none;
   width: 80px;
   height: 4px;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-light);
   border: 1px solid var(--border-light);
-  border-radius: 2px;
+  border-radius: 20px;
   outline: none;
   cursor: pointer;
 }
@@ -1286,6 +1404,60 @@ def get_audio_player_css():
   border: 1px solid var(--accent-hover);
   border-radius: 50%;
   cursor: pointer;
+}
+
+/* ========================================
+   MINI PLAYER FOCUS STATES (Remove Blue Glow)
+   ======================================== */
+
+/* Remove default browser focus outlines from all mini-player controls */
+.mini-player *:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Accessible keyboard navigation with theme-consistent styling */
+.mini-player *:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Button focus states - subtle teal ring */
+.mini-btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+/* Volume slider focus - no outline, just thumb highlight */
+.mini-volume-slider:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.mini-volume-slider:focus-visible {
+  outline: none; /* No outline on track, thumb provides visual feedback */
+}
+
+.mini-volume-slider:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.3);
+  transform: scale(1.1);
+}
+
+.mini-volume-slider:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(0, 121, 107, 0.3);
+  transform: scale(1.1);
+}
+
+/* Remove any webkit-focus-ring-color */
+.mini-player input,
+.mini-player button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent blue backgrounds on active states */
+.mini-player input:active,
+.mini-player button:active {
+  background-color: inherit;
 }
 
 /* ========================================
@@ -1319,6 +1491,30 @@ def get_audio_player_css():
   .audio-play-btn {
     width: 70px;
     height: 70px;
+  }
+
+  /* Mobile mini-player: full-width with safe-area-inset */
+  .mini-player {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: none;
+    width: 100%;
+    transform: none;
+    /* Mobile: Use solid background for better readability on small screens */
+    background: var(--surface-color);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border: none;
+    border-top: 1px solid var(--border-color);
+    border-radius: 0;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Remove enhanced shadow from album art on mobile */
+  .mini-art {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
   }
 
   .mini-info {
@@ -1365,14 +1561,13 @@ def get_audio_player_css():
 """
 
 
-
 def get_audio_player_js():
     """
     Returns ultra-optimized JavaScript with dual-mode player and LED VU meter.
-    
+
     Design Decision: Logarithmic frequency mapping for VU meter (not linear/mel scale).
     Rationale: Perceptually linear for music, matches human hearing sensitivity.
-    
+
     Performance optimizations:
     - Persistent audio element (never destroyed - zero stuttering)
     - Pre-allocated typed arrays for 14-bar VU meter

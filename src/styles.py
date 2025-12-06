@@ -30,10 +30,10 @@ CSS_STYLESHEET = """
   /* Borders - Industrial Definition */
   --border-color: #3E3E3E;       /* Charcoal - maintains sharpness without harshness */
   --border-light: #D0D0D0;       /* Softer border for secondary elements */
-  --border-width: 2px;
+  --border-width: 1px;
 
   /* Spacing & Sizing */
-  --radius: 4px;
+  --radius: 8px;
 
   /* Typography */
   /* Unified font stack for consistent Teenage Engineering-inspired industrial aesthetic.
@@ -48,6 +48,7 @@ CSS_STYLESHEET = """
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  transition: border-radius 0.3s ease, border-width 0.3s ease;
 }
 
 html,
@@ -89,11 +90,13 @@ body {
 .device-shell {
   background: var(--surface-color);
   border: var(--border-width) solid var(--border-color);
+  border-radius: 12px;
   width: 100%;
   display: grid;
   grid-template-rows: auto auto 1fr auto;
-  box-shadow: 10px 10px 0px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Desktop Layout */
@@ -239,7 +242,7 @@ body {
 
 .panel {
   border: var(--border-width) solid var(--border-color);
-  border-radius: var(--radius);
+  border-radius: 10px;
   background: #ffffff;
   padding: 0.75rem 0.9rem;
   display: flex;
@@ -247,6 +250,7 @@ body {
   gap: 0.5rem;
   min-width: 0;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .panel-title {
@@ -320,6 +324,7 @@ body {
   background: var(--accent-color);
   color: #ffffff;
   border: var(--border-width) solid var(--border-color);
+  border-radius: 8px;
   padding: 0.4rem;
   text-transform: uppercase;
   font-weight: 600;
@@ -335,12 +340,35 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-ui);
+  box-shadow: none;
+  transition: background 0.05s ease, transform 0.05s ease;
+}
+
+.file-button:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.file-button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.file-button:focus {
+  box-shadow: none;
+}
+
+.file-button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .file-name {
   flex: 1;
   padding: 0 0.3rem;
   border: 1px dashed #bbbbbb;
+  border-radius: 8px;
   color: var(--text-dim);
   white-space: nowrap;
   font-size: 0.65rem;
@@ -361,6 +389,7 @@ body {
   -webkit-appearance: none;
   background: #ffffff;
   border: var(--border-width) solid var(--border-color);
+  border-radius: 8px;
   color: var(--text-main);
   padding: 0.4rem;
   font-family: var(--font-ui);
@@ -368,7 +397,7 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.08s ease;
+  transition: background 0.05s ease, color 0.05s ease, border-color 0.05s ease, transform 0.05s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -381,20 +410,31 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  box-shadow: none;
 }
 
 .btn:hover {
   background: var(--accent-color);
   color: #ffffff;
-  transform: translateY(-1px);
-  box-shadow: 2px 2px 0 var(--text-main);
+  border-color: var(--accent-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .btn:active {
-  transform: translateY(0);
+  transform: translateY(1px);
   box-shadow: none;
   background: var(--accent-hover);
   color: #ffffff;
+}
+
+.btn:focus {
+  box-shadow: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .btn:disabled {
@@ -541,31 +581,6 @@ a:active {
 }
 
 
-/* Footer / Status Bar */
-
-.device-footer {
-  padding: 0.5rem 1.25rem;
-  border-top: var(--border-width) solid var(--border-color);
-  background: var(--surface-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-family: var(--font-ui);
-  font-size: 0.65rem;
-}
-
-.device-footer span.label {
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 700;
-  color: var(--text-main);
-}
-
-.device-footer span.value {
-  color: var(--text-dim);
-}
-
-
 /* Upload Progress Indicator */
 
 .upload-progress {
@@ -584,7 +599,7 @@ a:active {
   height: 10px;
   background: var(--surface-alt);
   border: 1px solid var(--border-light);
-  border-radius: var(--radius);
+  border-radius: 8px;
   overflow: hidden;
 }
 
@@ -592,7 +607,7 @@ a:active {
   height: 100%;
   width: 0%;
   background: var(--accent-color);
-  border-radius: var(--radius);
+  border-radius: 8px;
   transition: width 0.15s ease;
 }
 
@@ -612,7 +627,7 @@ a:active {
   display: none;
   padding: 0.4rem 0.6rem;
   background: #fef2f2;
-  border-radius: var(--radius);
+  border-radius: 8px;
   border: 1px solid var(--error-color);
 }
 
@@ -666,6 +681,7 @@ a:active {
   flex: 1;
   overflow-y: auto;
   border: var(--border-width) solid var(--border-color);
+  border-radius: 10px;
   padding: 0.6rem;
   background: var(--surface-color);
   display: flex;
@@ -675,6 +691,7 @@ a:active {
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
   scrollbar-width: none;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .chat-messages::-webkit-scrollbar {
@@ -686,6 +703,7 @@ a:active {
 .chat-message {
   padding: 0.5rem 0.6rem;
   border-left: 3px solid var(--border-light);
+  border-radius: 6px;
   background: var(--surface-alt);
   word-wrap: break-word;
   font-family: var(--font-ui);
@@ -725,19 +743,32 @@ a:active {
   color: #ff3b00;
   background: transparent;
   border: 1px solid #ff3b00;
-  border-radius: 2px;
+  border-radius: 6px;
   cursor: pointer;
   line-height: 1;
-  transition: all 0.15s ease;
+  transition: background 0.05s ease, color 0.05s ease, transform 0.05s ease;
+  box-shadow: none;
 }
 
 .kick-button:hover {
   background: #ff3b00;
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .kick-button:active {
-  transform: scale(0.95);
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.kick-button:focus {
+  box-shadow: none;
+}
+
+.kick-button:focus-visible {
+  outline: 2px solid #ff3b00;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* Chat Disconnected State */
@@ -769,22 +800,56 @@ a:active {
   color: var(--text-main);
   background: var(--surface-alt);
   border: var(--border-width) solid var(--border-color);
+  border-radius: 8px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: all 0.15s ease;
+  transition: background 0.05s ease, color 0.05s ease, border-color 0.05s ease, transform 0.05s ease;
+  box-shadow: none;
 }
 
 .btn-manage-devices:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-manage-devices:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.btn-manage-devices:focus {
+  box-shadow: none;
+}
+
+.btn-manage-devices:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .btn-manage-bans:hover {
   background: #ff3b00;
   border-color: #ff3b00;
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.btn-manage-bans:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.btn-manage-bans:focus {
+  box-shadow: none;
+}
+
+.btn-manage-bans:focus-visible {
+  outline: 2px solid #ff3b00;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* Active Devices Section */
@@ -792,9 +857,11 @@ a:active {
 .active-devices-section {
   background: var(--surface-main);
   border: var(--border-width) solid var(--accent-color);
+  border-radius: 10px;
   margin-bottom: 0.5rem;
   max-height: 200px;
   overflow-y: auto;
+  overflow: hidden;
 }
 
 .active-header {
@@ -815,6 +882,7 @@ a:active {
 .active-close {
   background: transparent;
   border: 1px solid #ffffff;
+  border-radius: 4px;
   color: #ffffff;
   font-size: 1rem;
   font-weight: bold;
@@ -822,11 +890,28 @@ a:active {
   padding: 0 0.3rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: none;
 }
 
 .active-close:hover {
   background: #ffffff;
   color: var(--accent-color);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.active-close:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.active-close:focus {
+  box-shadow: none;
+}
+
+.active-close:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .active-list {
@@ -841,6 +926,7 @@ a:active {
   margin-bottom: 0.3rem;
   background: var(--surface-alt);
   border-left: 3px solid var(--accent-color);
+  border-radius: 6px;
   font-family: var(--font-ui);
 }
 
@@ -868,19 +954,33 @@ a:active {
   color: #ffffff;
   background: #ff3b00;
   border: 1px solid #ff3b00;
+  border-radius: 6px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   transition: all 0.15s ease;
+  box-shadow: none;
 }
 
 .kick-button-inline:hover {
   background: #cc2f00;
   border-color: #cc2f00;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .kick-button-inline:active {
-  transform: scale(0.95);
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.kick-button-inline:focus {
+  box-shadow: none;
+}
+
+.kick-button-inline:focus-visible {
+  outline: 2px solid #ff3b00;
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* Banned Devices Section */
@@ -888,9 +988,11 @@ a:active {
 .banned-devices-section {
   background: var(--surface-main);
   border: var(--border-width) solid var(--border-color);
+  border-radius: 10px;
   margin-bottom: 0.5rem;
   max-height: 200px;
   overflow-y: auto;
+  overflow: hidden;
 }
 
 .banned-header {
@@ -910,6 +1012,7 @@ a:active {
 .banned-close {
   background: transparent;
   border: 1px solid var(--border-color);
+  border-radius: 4px;
   color: var(--text-dim);
   font-size: 1rem;
   font-weight: bold;
@@ -917,12 +1020,29 @@ a:active {
   padding: 0 0.3rem;
   cursor: pointer;
   transition: all 0.15s ease;
+  box-shadow: none;
 }
 
 .banned-close:hover {
   background: var(--error-color);
   border-color: var(--error-color);
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.banned-close:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.banned-close:focus {
+  box-shadow: none;
+}
+
+.banned-close:focus-visible {
+  outline: 2px solid var(--error-color);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .banned-list {
@@ -937,6 +1057,7 @@ a:active {
   margin-bottom: 0.3rem;
   background: var(--surface-alt);
   border-left: 3px solid var(--error-color);
+  border-radius: 6px;
   font-family: var(--font-ui);
 }
 
@@ -963,20 +1084,34 @@ a:active {
   color: var(--text-main);
   background: transparent;
   border: 1px solid var(--border-color);
+  border-radius: 6px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   transition: all 0.15s ease;
+  box-shadow: none;
 }
 
 .unkick-button:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
   color: #ffffff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .unkick-button:active {
-  transform: scale(0.95);
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+.unkick-button:focus {
+  box-shadow: none;
+}
+
+.unkick-button:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 /* Chat Content - Monospace Data */
@@ -1028,7 +1163,7 @@ a:active {
   border: var(--border-width) solid var(--border-color);
   font-family: var(--font-ui);
   font-size: 0.7rem;
-  border-radius: 0;
+  border-radius: 8px;
   background: var(--surface-color);
   color: var(--text-main);
   min-height: 44px;
@@ -1097,7 +1232,7 @@ a:active {
   border: 1px solid var(--border-light);
   padding: 0.3rem;
   background: #ffffff;
-  border-radius: var(--radius);
+  border-radius: 8px;
   width: max-content;
 }
 
@@ -1131,5 +1266,73 @@ a:active {
   font-size: 0.7rem;
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+
+/* Universal Button State Rules - Hardware Aesthetic */
+/* Default and active states have no shadow, hover has subtle depth */
+
+button,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+.btn,
+.file-button,
+.kick-button,
+.kick-button-inline,
+.unkick-button,
+.btn-manage-devices,
+.btn-manage-bans,
+.btn-download,
+.btn-chat,
+.active-close,
+.banned-close {
+  box-shadow: none !important;
+}
+
+button:active,
+input[type="submit"]:active,
+input[type="button"]:active,
+input[type="reset"]:active,
+.btn:active,
+.file-button:active,
+.kick-button:active,
+.kick-button-inline:active,
+.unkick-button:active,
+.btn-manage-devices:active,
+.btn-manage-bans:active,
+.btn-download:active,
+.btn-chat:active,
+.active-close:active,
+.banned-close:active {
+  box-shadow: none !important;
+}
+
+button:focus,
+input[type="submit"]:focus,
+input[type="button"]:focus,
+input[type="reset"]:focus,
+.btn:focus,
+.file-button:focus,
+.kick-button:focus,
+.kick-button-inline:focus,
+.unkick-button:focus,
+.btn-manage-devices:focus,
+.btn-manage-bans:focus,
+.btn-download:focus,
+.btn-chat:focus,
+.active-close:focus,
+.banned-close:focus {
+  box-shadow: none !important;
+}
+
+/* Only show outline on keyboard focus - no glow */
+button:focus-visible,
+input[type="submit"]:focus-visible,
+input[type="button"]:focus-visible,
+input[type="reset"]:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  box-shadow: none !important;
 }
 """
