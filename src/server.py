@@ -44,6 +44,7 @@ from .constants import (
 )
 from .ui import render_directory_listing
 from .upload import UploadResult, extract_boundary, parse_multipart_streaming
+from .audio_player import get_audio_metadata
 from .utils import generate_etag, get_mime_type, is_path_safe, parse_range_header
 
 if TYPE_CHECKING:
@@ -956,6 +957,49 @@ class VortexHandler(SimpleHTTPRequestHandler):
         is_host = self._is_host()
         self._send_json({"is_host": is_host})
 
+    def _handle_api_audio_metadata(self, query_params: Dict[str, List[str]]) -> None:
+        """
+        Handle GET /api/audio-metadata - extract audio file metadata.
+        
+        Returns JSON with title, artist, album, and base64-encoded artwork.
+        Supports MP3 (ID3v2) and M4A (MP4 atoms) formats.
+        """
+        # Get file parameter
+        file_param = query_params.get("file")
+        if not file_param or len(file_param) == 0:
+            self._send_json({"error": "Missing file parameter"}, 400)
+            return
+
+        # Decode URL-encoded file path
+        file_url = file_param[0]
+        
+        # Parse URL to get path
+        try:
+            parsed = urlparse(file_url)
+            file_path = unquote(parsed.path)
+            
+            # Translate to filesystem path
+            full_path = self.translate_path(file_path)
+            
+            # Security: Validate path is within base directory
+            if not self._is_request_path_safe(full_path):
+                self._send_json({"error": "Access denied"}, 403)
+                return
+            
+            # Check if file exists
+            if not os.path.isfile(full_path):
+                self._send_json({"error": "File not found"}, 404)
+                return
+            
+            # Extract metadata using audio_player module
+            metadata = get_audio_metadata(full_path)
+            
+            # Send metadata as JSON
+            self._send_json(metadata)
+            
+        except Exception as e:
+            self._send_json({"error": f"Metadata extraction failed: {str(e)}"}, 500)
+
     def _handle_api_kick_post(self) -> None:
         """Handle POST /api/kick - ban a device (host only)."""
         # Verify host privileges
@@ -1104,6 +1148,9 @@ class VortexHandler(SimpleHTTPRequestHandler):
             return
         elif clean_path == "/api/active-devices":
             self._handle_api_active_devices_get(query_params)
+            return
+        elif clean_path == "/api/audio-metadata":
+            self._handle_api_audio_metadata(query_params)
             return
 
         path = self.translate_path(parsed.path)
