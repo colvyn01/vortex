@@ -63,6 +63,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function showTerminationMessage() {
+    // Abort all active uploads if any
+    try {
+      globalAbortAllUploads();
+    } catch (e) {
+      // Ignore errors if upload form not initialized
+    }
+    
     // Hide stop button
     var stopBtn = document.getElementById('server-stop-btn');
     if (stopBtn) {
@@ -116,6 +123,22 @@ document.addEventListener('DOMContentLoaded', function() {
   // Handles uploading multiple files simultaneously with aggregate progress.
 
   var uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
+  
+  // Global upload tracking for abortion capability
+  var globalFileProgress = {};
+  var globalAbortAllUploads = function() {
+    for (var key in globalFileProgress) {
+      var uploadData = globalFileProgress[key];
+      if (uploadData && uploadData.xhr) {
+        try {
+          uploadData.xhr.abort();
+        } catch (e) {
+          // Ignore abort errors
+        }
+      }
+    }
+    globalFileProgress = {};
+  };
 
   if (uploadForm) {
     uploadForm.addEventListener('submit', function(e) {
@@ -154,14 +177,25 @@ document.addEventListener('DOMContentLoaded', function() {
       if (submitBtn) submitBtn.disabled = true;
 
       // Track bytes uploaded per file for accurate progress calculation
-      var fileProgress = {};
+      // Store both progress and XHR objects for abortion capability
+      var fileProgress = globalFileProgress;
+
+      // --- Abort All Uploads Function ---
+      // Called when server is terminating to cancel all in-progress uploads
+
+      function abortAllUploads() {
+        globalAbortAllUploads();
+      }
 
       // --- Progress Update Function ---
 
       function updateProgress() {
         var currentUploaded = uploadedBytes;
         for (var key in fileProgress) {
-          currentUploaded += fileProgress[key];
+          var uploadData = fileProgress[key];
+          if (uploadData) {
+            currentUploaded += uploadData.bytes || 0;
+          }
         }
         var percent = totalBytes > 0
           ? Math.round((currentUploaded / totalBytes) * 100)
@@ -191,17 +225,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
       function uploadFile(file, idx) {
         activeUploads++;
-        fileProgress[idx] = 0;
+        fileProgress[idx] = { bytes: 0, xhr: null };
 
         var formData = new FormData();
         formData.append('file', file);
 
         var xhr = new XMLHttpRequest();
+        
+        // Store XHR reference for potential abortion
+        fileProgress[idx].xhr = xhr;
 
         // Track upload progress for this file
         xhr.upload.addEventListener('progress', function(e) {
           if (e.lengthComputable) {
-            fileProgress[idx] = e.loaded;
+            fileProgress[idx].bytes = e.loaded;
             updateProgress();
           }
         });
@@ -210,6 +247,13 @@ document.addEventListener('DOMContentLoaded', function() {
         xhr.addEventListener('load', function() {
           activeUploads--;
           delete fileProgress[idx];
+
+          if (xhr.status === 503) {
+            // Server is shutting down
+            abortAllUploads();
+            showTerminationMessage();
+            return;
+          }
 
           if (xhr.status >= 200 && xhr.status < 400) {
             completedFiles++;
@@ -239,6 +283,12 @@ document.addEventListener('DOMContentLoaded', function() {
           } else if (activeUploads === 0) {
             handleAllComplete();
           }
+        });
+
+        // Handle abort events
+        xhr.addEventListener('abort', function() {
+          activeUploads--;
+          delete fileProgress[idx];
         });
 
         xhr.open('POST', window.location.pathname, true);
@@ -722,6 +772,17 @@ document.addEventListener('DOMContentLoaded', function() {
     eventSource.onmessage = function(event) {
       try {
         var message = JSON.parse(event.data);
+        
+        // Check for server termination message
+        if (message.type === 'server_terminating') {
+          showTerminationMessage();
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          return;
+        }
+        
         renderMessage(message);
         
         // Update connection status

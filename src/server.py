@@ -94,6 +94,11 @@ _server_display_address: Optional[str] = None
 # Track when server is shutting down to notify clients
 _server_terminating: bool = False
 
+# Active Uploads Tracking
+# Track all in-progress uploads for graceful shutdown
+_active_uploads: Dict[str, str] = {}  # {upload_id: temp_file_path}
+_active_uploads_lock = threading.Lock()
+
 
 # Chat Helper Functions
 
@@ -1086,16 +1091,40 @@ class VortexHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Only the host can stop the server"}, 403)
             return
 
-        # Set global terminating flag
-        global _server_terminating
+        # Set global terminating flag to prevent new uploads
+        global _server_terminating, _active_uploads
         _server_terminating = True
+
+        # Delete all partial upload files
+        with _active_uploads_lock:
+            for upload_id, temp_path in list(_active_uploads.items()):
+                try:
+                    if temp_path and os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except OSError:
+                    pass  # File may not exist yet or already deleted
+            _active_uploads.clear()
+
+        # Broadcast termination message to all SSE clients
+        with _sse_lock:
+            for session_id in _sse_queues:
+                termination_msg = {
+                    "type": "server_terminating",
+                    "message": "Server is shutting down",
+                    "timestamp": time.time()
+                }
+                for client_queue in _sse_queues[session_id]:
+                    try:
+                        client_queue.put_nowait(termination_msg)
+                    except queue.Full:
+                        pass
 
         # Send success response first
         self._send_json({"success": True, "message": "Server terminating"})
 
-        # Shutdown after 2 seconds (time for clients to receive message)
+        # Shutdown after 3 seconds (time for clients to receive SSE message)
         def delayed_shutdown():
-            time.sleep(2.0)
+            time.sleep(3.0)
             os._exit(0)
 
         threading.Thread(target=delayed_shutdown, daemon=True).start()
@@ -1287,6 +1316,12 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Uses streaming to handle large files without loading them entirely
         into memory. This allows uploading files of any size smoothly.
         """
+        # Check if server is terminating - reject new uploads
+        global _server_terminating
+        if _server_terminating:
+            self._send_error_safe(503, "Server is shutting down")
+            return
+
         # Security validation (rate limiting and token auth)
         if not self._validate_security():
             return
@@ -1339,13 +1374,25 @@ class VortexHandler(SimpleHTTPRequestHandler):
             self._send_error_safe(403, "Access denied")
             return
 
-        # Stream upload to disk
+        # Generate unique upload ID and register this upload
+        upload_id = str(uuid.uuid4())
+        
+        # Stream upload to disk with termination checking
         try:
             result: UploadResult = parse_multipart_streaming(
-                self.rfile, length, boundary, self.base_directory
+                self.rfile, length, boundary, self.base_directory,
+                upload_id=upload_id,
+                termination_check=lambda: _server_terminating
             )
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+            # Clean up upload tracking on connection error
+            with _active_uploads_lock:
+                _active_uploads.pop(upload_id, None)
             return
+
+        # Remove from active uploads tracking
+        with _active_uploads_lock:
+            _active_uploads.pop(upload_id, None)
 
         if not result.success:
             self._send_error_safe(400, result.error_message or "Upload failed")

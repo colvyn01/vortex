@@ -73,6 +73,8 @@ def parse_multipart_streaming(
     content_length: int,
     boundary: str,
     base_directory: str,
+    upload_id: Optional[str] = None,
+    termination_check: Optional[callable] = None,
 ) -> UploadResult:
     """
     Parse multipart form data using streaming to handle large files.
@@ -92,6 +94,8 @@ def parse_multipart_streaming(
         content_length: Total bytes to read from the stream.
         boundary: The multipart boundary string.
         base_directory: Directory where uploaded files will be saved.
+        upload_id: Optional unique identifier for tracking this upload.
+        termination_check: Optional callable that returns True if upload should abort.
 
     Returns:
         UploadResult indicating success or failure with error message.
@@ -186,6 +190,16 @@ def parse_multipart_streaming(
     try:
         temp_fd, temp_path = tempfile.mkstemp(dir=base_directory, prefix=".upload_")
 
+        # Track this upload if upload_id is provided
+        if upload_id:
+            try:
+                # Import here to avoid circular dependency
+                from . import server
+                with server._active_uploads_lock:
+                    server._active_uploads[upload_id] = temp_path
+            except (ImportError, AttributeError):
+                pass  # Server module not available or lock not initialized
+
         with os.fdopen(temp_fd, "wb") as temp_file:
             temp_fd = None  # fdopen takes ownership of the file descriptor
 
@@ -212,6 +226,10 @@ def parse_multipart_streaming(
 
                 # Stream remaining data with optimized chunked reads
                 while remaining > 0:
+                    # Check if server is terminating
+                    if termination_check and termination_check():
+                        return UploadResult(success=False, error_message="Upload aborted: server shutting down")
+                    
                     to_read = min(CHUNK_SIZE, remaining)
                     chunk = rfile.read(to_read)
                     if not chunk:
