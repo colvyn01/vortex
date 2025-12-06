@@ -194,59 +194,51 @@ def _create_parser() -> argparse.ArgumentParser:
         description="Vortex - Fast, cross-platform file transfer over local Wi-Fi",
     )
 
-    # Server control commands
-    parser.add_argument(
-        "--start",
-        action="store_true",
-        help="Start the Vortex file gateway server",
-    )
-    parser.add_argument(
-        "--stop",
-        action="store_true",
-        help="Stop a running Vortex server",
-    )
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Server configuration
-    parser.add_argument(
+    # START command
+    start_parser = subparsers.add_parser("start", help="Start the Vortex server")
+    start_parser.add_argument(
         "--port",
         type=int,
         default=DEFAULT_PORT,
-        help=f"Port to listen on (default: {DEFAULT_PORT})",
+        help=f"Port (default: {DEFAULT_PORT})",
     )
-    parser.add_argument(
+    start_parser.add_argument(
         "--dir",
         default=DEFAULT_DIR,
-        help="Directory to share (default: current directory)",
+        help="Directory to share (default: current)",
     )
-    parser.add_argument(
-        "--max-parallel",
-        type=int,
-        default=DEFAULT_MAX_PARALLEL,
-        help=f"Max parallel uploads from browser (default: {DEFAULT_MAX_PARALLEL})",
+    start_parser.add_argument(
+        "--https",
+        action="store_true",
+        help="Enable HTTPS",
     )
-    parser.add_argument(
+    start_parser.add_argument(
+        "--secure",
+        action="store_true",
+        help="Enable token authentication",
+    )
+    start_parser.add_argument(
+        "--new-token",
+        action="store_true",
+        help="Generate new token",
+    )
+    start_parser.add_argument(
         "--mode",
         choices=["auto", "localhost", "lan"],
         default="auto",
-        help="Address detection mode (default: auto)",
+        help="Address mode",
+    )
+    start_parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=DEFAULT_MAX_PARALLEL,
+        help="Max parallel uploads",
     )
 
-    # Security options
-    parser.add_argument(
-        "--https",
-        action="store_true",
-        help="Enable HTTPS with self-signed certificate",
-    )
-    parser.add_argument(
-        "--secure",
-        action="store_true",
-        help="Enable token authentication for all requests",
-    )
-    parser.add_argument(
-        "--new-token",
-        action="store_true",
-        help="Generate a new authentication token (use with --secure)",
-    )
+    # STOP command
+    subparsers.add_parser("stop", help="Stop the running Vortex server")
 
     return parser
 
@@ -263,17 +255,30 @@ def main() -> None:
     parser = _create_parser()
     args = parser.parse_args()
 
-    # Handle --stop
-    if args.stop:
+    if not args.command:
+        parser.print_help()
+        # Keep CMD open on Windows
+        if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            input("\nPress Enter to exit...")
+        return
+
+    # Handle stop command
+    if args.command == "stop":
         pid = _read_pid_file()
 
         if pid is None:
             print("No running Vortex server found.")
+            # Keep CMD open on Windows
+            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+                input("\nPress Enter to exit...")
             return
 
         if not _is_process_running(pid):
             print(f"Vortex server (PID {pid}) is not running.")
             _remove_pid_file()
+            # Keep CMD open on Windows
+            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+                input("\nPress Enter to exit...")
             return
 
         print(f"Stopping Vortex server (PID {pid})...")
@@ -282,15 +287,21 @@ def main() -> None:
             print("Vortex deactivated.")
         else:
             print("Failed to stop Vortex server.")
+        # Keep CMD open on Windows
+        if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            input("\nPress Enter to exit...")
         return
 
-    # Handle --start
-    if args.start:
+    # Handle start command
+    if args.command == "start":
         # Check if already running
         existing_pid = _read_pid_file()
         if existing_pid and _is_process_running(existing_pid):
             print(f"Vortex is already running (PID {existing_pid}).")
-            print("Use 'vortex --stop' to stop it first.")
+            print("Use 'vortex stop' to stop it first.")
+            # Keep CMD open on Windows
+            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+                input("\nPress Enter to exit...")
             return
 
         # Write PID file and start server
@@ -307,8 +318,8 @@ def main() -> None:
             )
         finally:
             _remove_pid_file()
+            # Keep CMD open on Windows
+            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+                input("\nPress Enter to exit...")
         return
-
-    # No action specified
-    parser.print_help()
 

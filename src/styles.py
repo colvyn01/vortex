@@ -153,9 +153,9 @@ body {
 }
 
 .server-stop-btn {
-  background: transparent;
+  background: var(--secondary-accent);
   border: 1px solid var(--secondary-accent);
-  color: var(--secondary-accent);
+  color: white;
   width: 24px;
   height: 24px;
   border-radius: 4px;
@@ -163,16 +163,10 @@ body {
   font-size: 1rem;
   line-height: 1;
   padding: 0;
-  transition: all 0.15s ease;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.server-stop-btn:hover {
-  background: var(--secondary-accent);
-  color: white;
 }
 
 .device-header p {

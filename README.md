@@ -177,7 +177,7 @@ Follow these steps in order to completely remove Vortex from your system.
 Open a terminal and run:
 
 ```bash
-vortex --stop
+vortex stop
 ```
 
 If no server is running, you will see: `No running Vortex server found.`
@@ -249,7 +249,7 @@ If you plan to reinstall from the same directory, do NOT remove the `vortex` dir
 Open a terminal and run:
 
 ```bash
-vortex --start
+vortex start
 ```
 
 The server will start in the current directory and display output like:
@@ -274,7 +274,7 @@ Press Ctrl+C to stop.
 Open a terminal and run:
 
 ```bash
-vortex --stop
+vortex stop
 ```
 
 Or press `Ctrl+C` in the terminal where the server is running.
@@ -284,74 +284,74 @@ Or press `Ctrl+C` in the terminal where the server is running.
 Share the current directory:
 
 ```bash
-vortex --start
+vortex start
 ```
 
 Share a specific directory:
 
 ```bash
-vortex --start --dir ~/Downloads
+vortex start --dir ~/Downloads
 ```
 
 Use a custom port:
 
 ```bash
-vortex --start --port 3000
+vortex start --port 3000
 ```
 
 Combine multiple options:
 
 ```bash
-vortex --start --dir ~/Documents --port 9000
+vortex start --dir ~/Documents --port 9000
 ```
 
 Share a network drive:
 
 ```bash
-vortex --start --dir /Volumes/NetworkDrive
+vortex start --dir /Volumes/NetworkDrive
 ```
 
 Windows: Share a specific drive:
 
 ```bash
-vortex --start --dir "D:\My Documents"
+vortex start --dir "D:\My Documents"
 ```
 
 ## Usage
 
 ### Basic Operation
 
-1. Start the server with `vortex --start`
+1. Start the server with `vortex start`
 2. Note the URL displayed in the terminal
 3. Open the URL in a web browser on another device
 4. Upload files by clicking "Choose files" and then "Send"
 5. Download files by clicking the file name
-6. Stop the server with `vortex --stop`
+6. Stop the server with `vortex stop`
 
 ### Selecting Different Directories
 
 **Share your Downloads folder:**
 
 ```bash
-vortex --start --dir ~/Downloads
+vortex start --dir ~/Downloads
 ```
 
 **Share a specific project folder:**
 
 ```bash
-vortex --start --dir ~/Projects/MyProject
+vortex start --dir ~/Projects/MyProject
 ```
 
 **Share a shared folder on your network (macOS):**
 
 ```bash
-vortex --start --dir /Volumes/SharedFolder
+vortex start --dir /Volumes/SharedFolder
 ```
 
 **Share a network drive (Windows):**
 
 ```bash
-vortex --start --dir "\\192.168.1.50\SharedFolder"
+vortex start --dir "\\192.168.1.50\SharedFolder"
 ```
 
 ### Using Custom Ports
@@ -359,7 +359,7 @@ vortex --start --dir "\\192.168.1.50\SharedFolder"
 Default port is 8000. If this port is already in use, specify a different port:
 
 ```bash
-vortex --start --port 3000
+vortex start --port 3000
 ```
 
 Then access at: `http://192.168.1.100:3000`
@@ -389,7 +389,7 @@ When you start Vortex, you see an IP address like `192.168.1.100`. This is your 
 The `--mode` flag controls how Vortex detects the network address:
 
 ```bash
-vortex --start --mode auto
+vortex start --mode auto
 ```
 
 **Available modes:**
@@ -405,7 +405,7 @@ vortex --start --mode auto
 Test locally before sharing:
 
 ```bash
-vortex --start --mode localhost
+vortex start --mode localhost
 ```
 
 Then visit: `http://127.0.0.1:8000`
@@ -413,13 +413,13 @@ Then visit: `http://127.0.0.1:8000`
 Require LAN access (fail if no network):
 
 ```bash
-vortex --start --mode lan
+vortex start --mode lan
 ```
 
 Use automatic detection (default):
 
 ```bash
-vortex --start --mode auto
+vortex start --mode auto
 ```
 
 ### Token Authentication
@@ -429,7 +429,7 @@ Token authentication restricts file access to users who provide a secret token.
 **Start with token authentication:**
 
 ```bash
-vortex --start --secure
+vortex start --secure
 ```
 
 Output:
@@ -455,7 +455,7 @@ Share this on your network: http://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8
 **Regenerate a new token:**
 
 ```bash
-vortex --start --secure --new-token
+vortex start --secure --new-token
 ```
 
 This generates a new token. Previous tokens will no longer work.
@@ -473,7 +473,7 @@ HTTPS encrypts all traffic between your browser and the server using a self-sign
 **Start with HTTPS:**
 
 ```bash
-vortex --start --https
+vortex start --https
 ```
 
 Output:
@@ -545,7 +545,7 @@ Windows (not pre-installed):
 Use multiple security features together for maximum protection:
 
 ```bash
-vortex --start --https --secure
+vortex start --https --secure
 ```
 
 This enables:
@@ -604,7 +604,7 @@ Seek in media:
 ### Starting the Server
 
 ```bash
-vortex --start [OPTIONS]
+vortex start [OPTIONS]
 ```
 
 Available options:
@@ -633,12 +633,16 @@ Available options:
 --new-token                  Generate a new authentication token
                              Used with: --secure
                              Example: --secure --new-token
+
+--max-parallel NUMBER        Max parallel uploads from browser
+                             Default: 4
+                             Example: --max-parallel 8
 ```
 
 ### Stopping the Server
 
 ```bash
-vortex --stop
+vortex stop
 ```
 
 Stops the currently running Vortex server.
@@ -664,49 +668,49 @@ Shows the installed Vortex version.
 Share the current directory on the default port:
 
 ```bash
-vortex --start
+vortex start
 ```
 
 Share a specific directory with a custom port:
 
 ```bash
-vortex --start --dir ~/Documents --port 3000
+vortex start --dir ~/Documents --port 3000
 ```
 
 Share with token authentication only:
 
 ```bash
-vortex --start --secure
+vortex start --secure
 ```
 
 Share with HTTPS only:
 
 ```bash
-vortex --start --https
+vortex start --https
 ```
 
 Share with both HTTPS and token authentication:
 
 ```bash
-vortex --start --https --secure
+vortex start --https --secure
 ```
 
 Regenerate and use a new token:
 
 ```bash
-vortex --start --secure --new-token
+vortex start --secure --new-token
 ```
 
 Share with all security features and custom port:
 
 ```bash
-vortex --start --https --secure --port 8443
+vortex start --https --secure --port 8443
 ```
 
 Restrict to localhost only:
 
 ```bash
-vortex --start --mode localhost
+vortex start --mode localhost
 ```
 
 ## Web Interface
@@ -849,7 +853,7 @@ Vortex is designed for trusted local networks. Understand the security implicati
 
 ### Default Security (No Flags)
 
-When run with `vortex --start` only:
+When run with `vortex start` only:
 
 - No encryption: Traffic visible to anyone on the network
 - No authentication: Anyone with the URL can upload/download
@@ -882,7 +886,7 @@ Use this mode only on networks you fully trust.
 **Home network with trusted family:**
 
 ```bash
-vortex --start
+vortex start
 ```
 
 No security features needed.
@@ -890,7 +894,7 @@ No security features needed.
 **Office network with colleagues:**
 
 ```bash
-vortex --start --secure
+vortex start --secure
 ```
 
 Token authentication prevents random access.
@@ -898,7 +902,7 @@ Token authentication prevents random access.
 **Public WiFi (coffee shop, airport):**
 
 ```bash
-vortex --start --https --secure
+vortex start --https --secure
 ```
 
 Both encryption and authentication for maximum security.
@@ -906,7 +910,7 @@ Both encryption and authentication for maximum security.
 **Sharing sensitive documents:**
 
 ```bash
-vortex --start --https --secure
+vortex start --https --secure
 ```
 
 Plus: Encrypt files before uploading, delete files immediately after sharing.
@@ -978,7 +982,7 @@ This means port 8000 is already in use by another application.
 Solution:
 
 ```bash
-vortex --start --port 9000
+vortex start --port 9000
 ```
 
 Replace 9000 with any unused port.
@@ -990,7 +994,7 @@ You do not have read permissions for the specified directory.
 Solution 1: Use a directory you own:
 
 ```bash
-vortex --start --dir ~/Downloads
+vortex start --dir ~/Downloads
 ```
 
 Solution 2: Grant read permissions:
@@ -999,7 +1003,7 @@ macOS/Linux:
 
 ```bash
 chmod -R 755 /path/to/directory
-vortex --start --dir /path/to/directory
+vortex start --dir /path/to/directory
 ```
 
 Windows: Right-click directory → Properties → Security → Edit permissions
@@ -1011,7 +1015,7 @@ The specified directory does not exist.
 Solution: Check the path spelling and ensure the directory exists:
 
 ```bash
-vortex --start --dir ~/MyExistingFolder
+vortex start --dir ~/MyExistingFolder
 ```
 
 #### Server runs but is not accessible
@@ -1041,8 +1045,8 @@ Solution - Windows:
 Restart Vortex:
 
 ```bash
-vortex --stop
-vortex --start
+vortex stop
+vortex start
 ```
 
 Solution - macOS:
@@ -1070,7 +1074,7 @@ The server is running but the address is wrong.
 Solution: Verify the IP address shown when server starts:
 
 ```bash
-vortex --start
+vortex start
 ```
 
 Check the output for the address shown (example: `http://192.168.1.100:8000`).
@@ -1114,8 +1118,8 @@ sudo yum install openssl
 After installation, restart Vortex:
 
 ```bash
-vortex --stop
-vortex --start --https
+vortex stop
+vortex start --https
 ```
 
 **Problem:** Browser always warns about certificate
@@ -1141,7 +1145,7 @@ http://192.168.1.100:8000?token=EXACTTOKENFROMSERVER
 Solution 2: Regenerate a new token:
 
 ```bash
-vortex --start --secure --new-token
+vortex start --secure --new-token
 ```
 
 Use the new token shown in the output.
@@ -1175,8 +1179,8 @@ Solution: Check the terminal output carefully. Look for a line starting with `Sh
 If not visible, the output may have scrolled. Restart the server:
 
 ```bash
-vortex --stop
-vortex --start
+vortex stop
+vortex start
 ```
 
 #### Server address shows localhost instead of IP
@@ -1188,14 +1192,14 @@ This means the server detected no network connection.
 Solution 1: Connect to WiFi and restart:
 
 ```bash
-vortex --stop
-vortex --start
+vortex stop
+vortex start
 ```
 
 Solution 2: Force LAN mode:
 
 ```bash
-vortex --start --mode lan
+vortex start --mode lan
 ```
 
 If this fails, no network is available.
@@ -1365,7 +1369,7 @@ sudo yum install git
 Solution 1: Ensure the server is stopped:
 
 ```bash
-vortex --stop
+vortex stop
 ```
 
 Solution 2: Use -y flag to skip confirmation:
