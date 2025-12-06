@@ -982,5 +982,161 @@ document.addEventListener('DOMContentLoaded', function() {
         dirSizeInfo.textContent = 'Size unavailable';
       });
   }
+
+  /**
+   * Directory Navigation Without Page Reload
+   * Intercepts directory link clicks to maintain audio player state.
+   */
+  (function initDirectoryNavigation() {
+    // Helper to check if a filename is an audio file
+    function isAudioFile(filename) {
+      var audioExts = ['.mp3', '.m4a', '.aac', '.flac', '.wav', '.ogg', '.opus', '.wma'];
+      var lower = filename.toLowerCase();
+      return audioExts.some(function(ext) {
+        return lower.endsWith(ext);
+      });
+    }
+
+    // Intercept directory link clicks
+    document.addEventListener('click', function(e) {
+      var target = e.target.closest('a');
+      if (!target) return;
+
+      var href = target.getAttribute('href');
+      if (!href) return;
+
+      var filename = target.textContent.trim();
+
+      // Skip if:
+      // - Audio file (handled by audio player)
+      // - Download action
+      // - External link
+      // - Parent directory (..)
+      if (isAudioFile(filename) || href.includes('?download') || href.startsWith('http')) {
+        return;
+      }
+
+      // Check if it's a directory link (ends with / or is parent directory)
+      var isDirectory = href.endsWith('/') || filename === '[..]';
+      if (!isDirectory) {
+        // Check if it has a file extension
+        var hasExtension = /\.[a-z0-9]+$/i.test(href.replace(/\/$/, ''));
+        if (hasExtension) return; // Let file downloads proceed normally
+      }
+
+      // Intercept directory navigation
+      e.preventDefault();
+      e.stopPropagation();
+      navigateToDirectory(href);
+    });
+
+    /**
+     * Navigate to a directory without full page reload.
+     */
+    function navigateToDirectory(path) {
+      var fileList = document.querySelector('.file-list');
+      if (!fileList) {
+        // Fallback to full page load if file list not found
+        window.location.href = path;
+        return;
+      }
+
+      // Add loading state
+      fileList.classList.add('updating');
+
+      fetch(path, {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+        .then(function(response) {
+          if (!response.ok) throw new Error('Navigation failed');
+          return response.text();
+        })
+        .then(function(html) {
+          var parser = new DOMParser();
+          var doc = parser.parseFromString(html, 'text/html');
+
+          // Update file listing
+          var newFileList = doc.querySelector('.file-list');
+          var currentFileList = document.querySelector('.file-list');
+          if (newFileList && currentFileList) {
+            currentFileList.innerHTML = newFileList.innerHTML;
+            currentFileList.classList.remove('updating');
+          }
+
+          // Update path display
+          var newSubheader = doc.querySelector('.device-subheader');
+          var currentSubheader = document.querySelector('.device-subheader');
+          if (newSubheader && currentSubheader) {
+            currentSubheader.innerHTML = newSubheader.innerHTML;
+          }
+
+          // Update session data (for chat context)
+          var newSessionData = doc.querySelector('#session-data');
+          var currentSessionData = document.querySelector('#session-data');
+          if (newSessionData && currentSessionData) {
+            currentSessionData.dataset.baseDir = newSessionData.dataset.baseDir;
+          }
+
+          // Update page title
+          var newTitle = doc.querySelector('title');
+          if (newTitle) {
+            document.title = newTitle.textContent;
+          }
+
+          // Update URL without reload
+          window.history.pushState({ path: path }, '', path);
+
+          // Update Download All button href if present
+          var downloadBtn = document.querySelector('.btn-download');
+          var newDownloadBtn = doc.querySelector('.btn-download');
+          if (downloadBtn && newDownloadBtn) {
+            downloadBtn.href = newDownloadBtn.href;
+          } else if (downloadBtn && !newDownloadBtn) {
+            downloadBtn.style.display = 'none';
+          } else if (!downloadBtn && newDownloadBtn) {
+            // Insert Download All button if it appeared
+            var panel = document.querySelector('.panel-files');
+            if (panel) {
+              var panelTitle = panel.querySelector('.panel-title');
+              if (panelTitle && panelTitle.nextSibling) {
+                panel.insertBefore(newDownloadBtn, panelTitle.nextSibling);
+              }
+            }
+          }
+
+          // Update upload form action to current path
+          var uploadForm = document.querySelector('.panel-upload form');
+          if (uploadForm) {
+            uploadForm.action = path;
+          }
+
+          // Refresh directory size
+          fetchDirectorySize();
+
+          // Audio player remains untouched - no DOM manipulation
+          // Mini-player continues playing seamlessly
+        })
+        .catch(function(error) {
+          console.error('Directory navigation failed:', error);
+          fileList.classList.remove('updating');
+          // Fallback to full page load
+          window.location.href = path;
+        });
+    }
+
+    // Handle browser back/forward buttons
+    window.addEventListener('popstate', function(e) {
+      if (e.state && e.state.path) {
+        navigateToDirectory(e.state.path);
+      } else {
+        window.location.reload();
+      }
+    });
+
+    // Set initial state for back button
+    window.history.replaceState({ path: window.location.pathname }, '');
+  })();
 });
 """

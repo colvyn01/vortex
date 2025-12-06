@@ -517,6 +517,12 @@ body {
   -webkit-overflow-scrolling: touch;
   -ms-overflow-style: none;
   scrollbar-width: none;
+  transition: opacity 0.15s ease;
+}
+
+.file-list.updating {
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .file-list::-webkit-scrollbar {
