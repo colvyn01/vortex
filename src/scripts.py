@@ -18,6 +18,68 @@ document.addEventListener('DOMContentLoaded', function() {
   var MAX_PARALLEL = 4;
 
 
+  // Server Stop Button
+  // Handle server shutdown request (host only).
+
+  var stopBtn = document.getElementById('server-stop-btn');
+  if (stopBtn) {
+    stopBtn.addEventListener('click', function() {
+      if (confirm('Stop the Vortex server?')) {
+        fetch('/api/stop-server', { method: 'POST' })
+          .then(function(response) {
+            return response.json();
+          })
+          .then(function(data) {
+            if (data.success) {
+              showTerminationMessage();
+            } else {
+              alert(data.error || 'Failed to stop server');
+            }
+          })
+          .catch(function(err) {
+            console.error('Error stopping server:', err);
+          });
+      }
+    });
+  }
+
+
+  // Poll server status every 500ms
+  function checkServerStatus() {
+    fetch('/api/server-status')
+      .then(function(response) {
+        return response.json();
+      })
+      .then(function(data) {
+        if (data.terminating) {
+          showTerminationMessage();
+        } else {
+          setTimeout(checkServerStatus, 500);
+        }
+      })
+      .catch(function() {
+        // Server already stopped - ignore errors
+      });
+  }
+
+  function showTerminationMessage() {
+    // Hide stop button
+    var stopBtn = document.getElementById('server-stop-btn');
+    if (stopBtn) {
+      stopBtn.style.display = 'none';
+    }
+    
+    // Remove all main content
+    var deviceMain = document.querySelector('.device-main');
+    if (deviceMain) {
+      deviceMain.innerHTML = '<div class="termination-message">SERVER TERMINATED</div>';
+    }
+  }
+
+  // Start polling on page load
+  checkServerStatus();
+
+
   // File Input Display
   // Update the filename display when user selects files.
 
@@ -350,6 +412,12 @@ document.addEventListener('DOMContentLoaded', function() {
             hostControls.style.display = 'flex';
           }
           initializeBannedDevicesUI();
+          
+          // Show stop button for host only
+          var stopBtn = document.getElementById('server-stop-btn');
+          if (stopBtn) {
+            stopBtn.style.display = 'flex';
+          }
         }
       })
       .catch(function(error) {

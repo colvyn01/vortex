@@ -90,6 +90,10 @@ SIZE_CACHE_DURATION = 30  # seconds
 # Server Configuration (for host detection)
 _server_display_address: Optional[str] = None
 
+# Server Termination State
+# Track when server is shutting down to notify clients
+_server_terminating: bool = False
+
 
 # Chat Helper Functions
 
@@ -1068,6 +1072,34 @@ class VortexHandler(SimpleHTTPRequestHandler):
             "message": "Device unbanned successfully"
         })
 
+    def _handle_api_stop_server_post(self) -> None:
+        """
+        Handle POST /api/stop-server - Stop the Vortex server.
+
+        Only the host can stop the server.
+
+        Response:
+            {"success": true, "message": "Server stopping..."}
+        """
+        # Only host can stop the server
+        if not self._is_host():
+            self._send_json({"error": "Only the host can stop the server"}, 403)
+            return
+
+        # Set global terminating flag
+        global _server_terminating
+        _server_terminating = True
+
+        # Send success response first
+        self._send_json({"success": True, "message": "Server terminating"})
+
+        # Shutdown after 2 seconds (time for clients to receive message)
+        def delayed_shutdown():
+            time.sleep(2.0)
+            os._exit(0)
+
+        threading.Thread(target=delayed_shutdown, daemon=True).start()
+
     def _handle_api_banned_devices_get(self) -> None:
         """Handle GET /api/banned-devices - list all banned devices (host only)."""
         # Verify host privileges
@@ -1131,7 +1163,11 @@ class VortexHandler(SimpleHTTPRequestHandler):
         clean_path = unquote(parsed.path)
 
         # API Endpoints
-        if clean_path == "/api/messages":
+        if clean_path == "/api/server-status":
+            global _server_terminating
+            self._send_json({"terminating": _server_terminating})
+            return
+        elif clean_path == "/api/messages":
             self._handle_api_messages_get(query_params)
             return
         elif clean_path == "/api/events":
@@ -1272,6 +1308,9 @@ class VortexHandler(SimpleHTTPRequestHandler):
             return
         elif clean_path == "/api/unkick":
             self._handle_api_unkick_post()
+            return
+        elif clean_path == "/api/stop-server":
+            self._handle_api_stop_server_post()
             return
 
         content_type = self.headers.get("Content-Type", "")

@@ -147,6 +147,32 @@ body {
   letter-spacing: 1px;
   font-weight: 800;
   font-family: var(--font-ui);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.server-stop-btn {
+  background: transparent;
+  border: 1px solid var(--secondary-accent);
+  color: var(--secondary-accent);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.server-stop-btn:hover {
+  background: var(--secondary-accent);
+  color: white;
 }
 
 .device-header p {
@@ -1200,6 +1226,31 @@ a:active {
   
   .chat-message {
     max-width: 100%;
+  }
+}
+
+
+/* Server Termination Message */
+
+.termination-message {
+  grid-column: 1 / -1;
+  background: white;
+  border: 2px solid var(--secondary-accent);
+  border-radius: 16px;
+  padding: 3rem;
+  text-align: center;
+  font-family: var(--font-ui);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--secondary-accent);
+  letter-spacing: 2px;
+  box-shadow: 0 8px 24px rgba(216, 67, 21, 0.2);
+}
+
+@media (max-width: 600px) {
+  .termination-message {
+    font-size: 1.2rem;
+    padding: 2rem;
   }
 }
 

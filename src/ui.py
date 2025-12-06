@@ -91,7 +91,10 @@ def render_layout(title: str, body_html: str) -> str:
   <div class="app-root">
     <div class="device-shell">
       <header class="device-header">
-        <h1>Vortex</h1>
+        <h1>
+          <span>Vortex</span>
+          <button id="server-stop-btn" class="server-stop-btn" aria-label="Stop server" title="Stop server" style="display: none;">×</button>
+        </h1>
         <p>Local file gateway</p>
       </header>
       {body_html}
