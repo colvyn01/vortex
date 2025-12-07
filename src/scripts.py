@@ -929,11 +929,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (chatInput) {
       chatInput.disabled = true;
       chatInput.placeholder = '/// CONNECTION TERMINATED ///';
-      chatInput.style.color = '#ff3b00';
-      chatInput.style.borderColor = '#ff3b00';
+      chatInput.style.color = '#C62828';
+      chatInput.style.borderColor = '#C62828';
     }
     if (chatStatus) {
-      chatStatus.style.color = '#ff3b00';
+      chatStatus.style.color = '#C62828';
     }
 
     // Show blocked message

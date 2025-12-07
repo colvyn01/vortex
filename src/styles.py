@@ -27,6 +27,11 @@ CSS_STYLESHEET = """
   --secondary-accent: #D84315;   /* Burnt orange - use sparingly (10% UI) */
   --error-color: #C62828;        /* Deep red - reserved for errors only */
 
+  /* RGB Values for RGBA */
+  --accent-rgb: 0,121,107;
+  --secondary-accent-rgb: 216,67,21;
+  --error-rgb: 198,40,40;
+
   /* Borders - Industrial Definition */
   --border-color: #3E3E3E;       /* Charcoal - maintains sharpness without harshness */
   --border-light: #D0D0D0;       /* Softer border for secondary elements */
@@ -766,9 +771,9 @@ a:active {
   font-size: 1rem;
   font-weight: bold;
   font-family: var(--font-ui);
-  color: #ff3b00;
+  color: var(--error-color);
   background: transparent;
-  border: 1px solid #ff3b00;
+  border: 1px solid var(--error-color);
   border-radius: 6px;
   cursor: pointer;
   line-height: 1;
@@ -777,7 +782,7 @@ a:active {
 }
 
 .kick-button:hover {
-  background: #ff3b00;
+  background: var(--error-color);
   color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -792,7 +797,7 @@ a:active {
 }
 
 .kick-button:focus-visible {
-  outline: 2px solid #ff3b00;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -805,7 +810,7 @@ a:active {
 }
 
 .chat-form input:disabled::placeholder {
-  color: #ff3b00;
+  color: var(--error-color);
 }
 
 /* Host Controls Container */
@@ -857,8 +862,8 @@ a:active {
 }
 
 .btn-manage-bans:hover {
-  background: #ff3b00;
-  border-color: #ff3b00;
+  background: var(--error-color);
+  border-color: var(--error-color);
   color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -873,7 +878,7 @@ a:active {
 }
 
 .btn-manage-bans:focus-visible {
-  outline: 2px solid #ff3b00;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -935,7 +940,7 @@ a:active {
 }
 
 .active-close:focus-visible {
-  outline: 2px solid #ffffff;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -978,8 +983,8 @@ a:active {
   font-weight: 600;
   font-family: var(--font-ui);
   color: #ffffff;
-  background: #ff3b00;
-  border: 1px solid #ff3b00;
+  background: var(--error-color);
+  border: 1px solid var(--error-color);
   border-radius: 6px;
   cursor: pointer;
   text-transform: uppercase;
@@ -989,8 +994,8 @@ a:active {
 }
 
 .kick-button-inline:hover {
-  background: #cc2f00;
-  border-color: #cc2f00;
+  background: color-mix(in srgb, var(--error-color) 70% black);
+  border-color: color-mix(in srgb, var(--error-color) 70% black);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1004,7 +1009,7 @@ a:active {
 }
 
 .kick-button-inline:focus-visible {
-  outline: 2px solid #ff3b00;
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -1066,7 +1071,7 @@ a:active {
 }
 
 .banned-close:focus-visible {
-  outline: 2px solid var(--error-color);
+  outline: 2px solid var(--accent-color);
   outline-offset: 2px;
   box-shadow: none;
 }
@@ -1244,7 +1249,7 @@ a:active {
   font-weight: 800;
   color: var(--secondary-accent);
   letter-spacing: 2px;
-  box-shadow: 0 8px 24px rgba(216, 67, 21, 0.2);
+  box-shadow: 0 8px 24px rgba(var(--secondary-accent-rgb), 0.2);
 }
 
 @media (max-width: 600px) {
