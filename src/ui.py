@@ -18,16 +18,35 @@ from urllib.parse import unquote
 
 from .scripts import JS_UPLOAD_HANDLER
 from .styles import CSS_STYLESHEET
-from .audio_player import get_audio_player_html, get_audio_player_css, get_audio_player_js
+from .audio_player import (
+    get_audio_player_html,
+    get_audio_player_css,
+    get_audio_player_js,
+)
+from .media_viewer import (
+    get_image_viewer_html,
+    get_image_viewer_css,
+    get_image_viewer_js,
+    get_video_player_html,
+    get_video_player_css,
+    get_video_player_js,
+)
 
 # Pre-generate combined resources (once at module load for performance)
 _AUDIO_PLAYER_CSS = get_audio_player_css()
-_COMPLETE_STYLESHEET = CSS_STYLESHEET + "\n\n" + _AUDIO_PLAYER_CSS
+_MEDIA_VIEWER_CSS = get_image_viewer_css() + "\n" + get_video_player_css()
+_COMPLETE_STYLESHEET = (
+    CSS_STYLESHEET + "\n\n" + _AUDIO_PLAYER_CSS + "\n\n" + _MEDIA_VIEWER_CSS
+)
 
 _AUDIO_PLAYER_JS = get_audio_player_js()
-_COMPLETE_SCRIPTS = JS_UPLOAD_HANDLER + "\n\n" + _AUDIO_PLAYER_JS
+_MEDIA_VIEWER_JS = get_image_viewer_js() + "\n" + get_video_player_js()
+_COMPLETE_SCRIPTS = (
+    JS_UPLOAD_HANDLER + "\n\n" + _AUDIO_PLAYER_JS + "\n\n" + _MEDIA_VIEWER_JS
+)
 
 _AUDIO_PLAYER_HTML = get_audio_player_html()
+_MEDIA_VIEWER_HTML = get_image_viewer_html() + get_video_player_html()
 
 
 # Size Formatting
@@ -299,7 +318,15 @@ def render_directory_listing(
     </main>
     """
 
-    # Inject audio player modal after device-shell
-    body_with_audio = subheader + main_content + "\n    </div>\n    " + _AUDIO_PLAYER_HTML + "\n    <div class=\"dummy-wrapper\">"
-    
-    return render_layout("Vortex", body_with_audio)
+    # Inject audio player and media viewer modals after device-shell
+    body_with_modals = (
+        subheader
+        + main_content
+        + "\n    </div>\n    "
+        + _AUDIO_PLAYER_HTML
+        + "\n    "
+        + _MEDIA_VIEWER_HTML
+        + '\n    <div class="dummy-wrapper">'
+    )
+
+    return render_layout("Vortex", body_with_modals)

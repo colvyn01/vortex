@@ -482,6 +482,11 @@ def get_audio_player_html():
       </svg>
     </button>
     <input type="range" id="mini-volume" class="mini-volume-slider" min="0" max="100" value="80" step="1" aria-label="Volume">
+    <a id="mini-download" class="mini-btn mini-download-btn" href="" download aria-label="Download track" title="Download">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+      </svg>
+    </a>
     <button id="mini-expand" class="mini-btn" aria-label="Expand player">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M7 13L12 8L17 13M7 17L12 12L17 17"/>
@@ -500,6 +505,11 @@ def get_audio_player_html():
   <div class="audio-player-container">
     <!-- Corner button group -->
     <div class="audio-corner-controls">
+      <a class="audio-download-btn" id="audio-download" href="" download aria-label="Download track" title="Download">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+        </svg>
+      </a>
       <button class="audio-minimize-btn" id="audio-minimize" aria-label="Minimize player" title="Minimize">
         <span style="font-size: 1.2rem;">−</span>
       </button>
@@ -800,7 +810,8 @@ html {
 
 /* Shared corner button styles */
 .audio-minimize-btn,
-.audio-dismiss-btn {
+.audio-dismiss-btn,
+.audio-download-btn {
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
@@ -816,6 +827,18 @@ html {
   transition: all 0.15s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  text-decoration: none;
+}
+
+.audio-download-btn {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  border-radius: 50%;
+}
+
+.audio-download-btn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
 }
 
 .audio-minimize-btn:hover {
@@ -831,8 +854,28 @@ html {
 }
 
 .audio-minimize-btn:active,
-.audio-dismiss-btn:active {
+.audio-dismiss-btn:active,
+.audio-download-btn:active {
   transform: translateY(1px) scale(1.02);
+}
+
+/* Mini-player download button */
+.mini-download-btn {
+  background: var(--accent-color);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  text-decoration: none;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.mini-download-btn:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
 }
 
 /* ========================================
@@ -1747,6 +1790,10 @@ def get_audio_player_js():
   const miniExpandBtn = document.getElementById('mini-expand');
   const miniCloseBtn = document.getElementById('mini-close');
 
+  // Download buttons
+  const miniDownloadBtn = document.getElementById('mini-download');
+  const audioDownloadBtn = document.getElementById('audio-download');
+
   // ========================================
   // UTILITY FUNCTIONS
   // ========================================
@@ -1958,6 +2005,16 @@ def get_audio_player_js():
     const track = currentPlaylist[index];
 
     audio.src = track.url;
+    
+    // Update download buttons with current track URL
+    if (miniDownloadBtn) {
+      miniDownloadBtn.href = track.url;
+      miniDownloadBtn.download = track.name || '';
+    }
+    if (audioDownloadBtn) {
+      audioDownloadBtn.href = track.url;
+      audioDownloadBtn.download = track.name || '';
+    }
     
     // Update playlist UI
     Array.from(playlistEl.children).forEach((el, i) => {

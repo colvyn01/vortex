@@ -1090,6 +1090,24 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     }
 
+    // Helper to check if a filename is an image file
+    function isImageFile(filename) {
+      var imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.bmp', '.svg', '.avif', '.tiff', '.tif'];
+      var lower = filename.toLowerCase();
+      return imageExts.some(function(ext) {
+        return lower.endsWith(ext);
+      });
+    }
+
+    // Helper to check if a filename is a video file
+    function isVideoFile(filename) {
+      var videoExts = ['.mp4', '.webm', '.mov', '.mkv', '.avi', '.m4v', '.ogv', '.3gp', '.wmv'];
+      var lower = filename.toLowerCase();
+      return videoExts.some(function(ext) {
+        return lower.endsWith(ext);
+      });
+    }
+
     // Intercept directory link clicks
     document.addEventListener('click', function(e) {
       var target = e.target.closest('a');
@@ -1106,6 +1124,26 @@ document.addEventListener('DOMContentLoaded', function() {
       // - External link
       // - Parent directory (..)
       if (isAudioFile(filename) || href.includes('?download') || href.startsWith('http')) {
+        return;
+      }
+
+      // Handle image files - open in image viewer
+      if (isImageFile(filename)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.VortexImageViewer && typeof window.VortexImageViewer.open === 'function') {
+          window.VortexImageViewer.open(href, filename);
+        }
+        return;
+      }
+
+      // Handle video files - open in video player
+      if (isVideoFile(filename)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.VortexVideoPlayer && typeof window.VortexVideoPlayer.open === 'function') {
+          window.VortexVideoPlayer.open(href, filename);
+        }
         return;
       }
 
