@@ -299,8 +299,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
       function handleAllComplete() {
         if (failedFiles.length === 0) {
-          // All uploads succeeded - refresh page to show new files
-          window.location.reload();
+          // All uploads succeeded - update file list via AJAX to preserve audio player
+          refreshFileList();
         } else {
           // Some uploads failed - show error
           if (uploadError) {
@@ -310,13 +310,101 @@ document.addEventListener('DOMContentLoaded', function() {
 
           if (completedFiles > 0) {
             // Some succeeded - refresh after brief delay
-            setTimeout(function() { window.location.reload(); }, 2000);
+            setTimeout(function() { refreshFileList(); }, 2000);
           } else {
             // All failed - reset UI for retry
             if (progressContainer) progressContainer.classList.remove('active');
             if (submitBtn) submitBtn.disabled = false;
           }
         }
+      }
+
+      /**
+       * Refresh file list without page reload (preserves audio player state).
+       * Uses same pattern as navigateToDirectory().
+       */
+      function refreshFileList() {
+        var fileList = document.querySelector('.file-list');
+        if (!fileList) {
+          // Fallback to full page reload if file list not found
+          window.location.reload();
+          return;
+        }
+
+        // Add loading state
+        fileList.classList.add('updating');
+
+        fetch(window.location.pathname, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+          .then(function(response) {
+            if (!response.ok) throw new Error('Refresh failed');
+            return response.text();
+          })
+          .then(function(html) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+
+            // Update file listing
+            var newFileList = doc.querySelector('.file-list');
+            var currentFileList = document.querySelector('.file-list');
+            if (newFileList && currentFileList) {
+              currentFileList.innerHTML = newFileList.innerHTML;
+              currentFileList.classList.remove('updating');
+            }
+
+            // Update path display
+            var newSubheader = doc.querySelector('.device-subheader');
+            var currentSubheader = document.querySelector('.device-subheader');
+            if (newSubheader && currentSubheader) {
+              currentSubheader.innerHTML = newSubheader.innerHTML;
+            }
+
+            // Update session data (for chat context)
+            var newSessionData = doc.querySelector('#session-data');
+            var currentSessionData = document.querySelector('#session-data');
+            if (newSessionData && currentSessionData) {
+              currentSessionData.dataset.baseDir = newSessionData.dataset.baseDir;
+            }
+
+            // Update Download All button href if present
+            var downloadBtn = document.querySelector('.btn-download');
+            var newDownloadBtn = doc.querySelector('.btn-download');
+            if (downloadBtn && newDownloadBtn) {
+              downloadBtn.href = newDownloadBtn.href;
+            } else if (downloadBtn && !newDownloadBtn) {
+              downloadBtn.style.display = 'none';
+            } else if (!downloadBtn && newDownloadBtn) {
+              // Insert Download All button if it appeared
+              var panel = document.querySelector('.panel-files');
+              if (panel) {
+                var panelTitle = panel.querySelector('.panel-title');
+                if (panelTitle && panelTitle.nextSibling) {
+                  panel.insertBefore(newDownloadBtn, panelTitle.nextSibling);
+                }
+              }
+            }
+
+            // Refresh directory size
+            if (typeof fetchDirectorySize === 'function') {
+              fetchDirectorySize();
+            }
+
+            // Audio player remains untouched - no DOM manipulation
+            // Mini-player continues playing seamlessly
+
+            // Reset upload UI
+            if (progressContainer) progressContainer.classList.remove('active');
+            if (submitBtn) submitBtn.disabled = false;
+          })
+          .catch(function(error) {
+            console.error('File list refresh failed:', error);
+            fileList.classList.remove('updating');
+            // Fallback to full page reload
+            window.location.reload();
+          });
       }
 
       // --- Start Upload ---
