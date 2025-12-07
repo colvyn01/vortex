@@ -101,6 +101,19 @@ def parse_multipart_streaming(
         UploadResult indicating success or failure with error message.
     """
     boundary_bytes = ("--" + boundary).encode(ENCODING)
+
+    # Validate disk space before accepting upload
+    stat = shutil.disk_usage(base_directory)
+    safety_margin = 100 * 1024 * 1024  # 100MB safety margin
+
+    if stat.free < (content_length + safety_margin):
+        available_mb = stat.free >> 20
+        required_mb = (content_length + safety_margin) >> 20
+        return UploadResult(
+            success=False,
+            error_message=f"Server disk full: need {required_mb}MB, have {available_mb}MB available",
+        )
+
     remaining = content_length
 
     # Phase 1: Find the first boundary
@@ -164,21 +177,23 @@ def parse_multipart_streaming(
 
     # Resolve filename conflicts by appending counter if file exists
     dest_path = os.path.join(base_directory, filename)
-    
+
     if os.path.exists(dest_path):
         # Separate filename and extension
         name_without_ext, ext = os.path.splitext(filename)
         counter = 1
-        
+
         # Incrementally append counter until we find a unique filename
         while os.path.exists(dest_path):
             new_filename = f"{name_without_ext} ({counter}){ext}"
             dest_path = os.path.join(base_directory, new_filename)
             counter += 1
-            
+
             # Safety check to prevent infinite loops
             if counter > 9999:
-                return UploadResult(success=False, error_message="Too many duplicate files")
+                return UploadResult(
+                    success=False, error_message="Too many duplicate files"
+                )
 
     # Phase 3: Stream file data to temporary file
     # Write to temp file first, then move to destination atomically.
@@ -195,6 +210,7 @@ def parse_multipart_streaming(
             try:
                 # Import here to avoid circular dependency
                 from . import server
+
                 with server._active_uploads_lock:
                     server._active_uploads[upload_id] = temp_path
             except (ImportError, AttributeError):
@@ -215,7 +231,7 @@ def parse_multipart_streaming(
                 # Large file: need to stream the rest
                 # Use optimized buffer for boundary detection
                 boundary_len = len(boundary_bytes)
-                
+
                 # Write initial safe data
                 if len(file_data_start) > boundary_len + 2:
                     safe_len = len(file_data_start) - boundary_len - 2
@@ -228,18 +244,21 @@ def parse_multipart_streaming(
                 while remaining > 0:
                     # Check if server is terminating
                     if termination_check and termination_check():
-                        return UploadResult(success=False, error_message="Upload aborted: server shutting down")
-                    
+                        return UploadResult(
+                            success=False,
+                            error_message="Upload aborted: server shutting down",
+                        )
+
                     to_read = min(CHUNK_SIZE, remaining)
                     chunk = rfile.read(to_read)
                     if not chunk:
                         break
                     remaining -= len(chunk)
-                    
+
                     # Append to buffer and check for boundary
                     buffer += chunk
                     boundary_pos = buffer.find(boundary_bytes)
-                    
+
                     if boundary_pos != -1:
                         # Found boundary - write final data
                         data_to_write = buffer[:boundary_pos]
@@ -247,7 +266,7 @@ def parse_multipart_streaming(
                             data_to_write = data_to_write[:-2]
                         temp_file.write(data_to_write)
                         break
-                    
+
                     # Write all but potential boundary overlap
                     if len(buffer) > boundary_len + 2:
                         safe_len = len(buffer) - boundary_len - 2

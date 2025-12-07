@@ -24,13 +24,16 @@ CONTENT_TYPE_ZIP = "application/zip"
 # Network Defaults
 
 FALLBACK_IP = "127.0.0.1"
-DNS_SERVERS = [("8.8.8.8", 53), ("1.1.1.1", 53)]  # Used to detect local IP via UDP socket trick
+DNS_SERVERS = [
+    ("8.8.8.8", 53),
+    ("1.1.1.1", 53),
+]  # Used to detect local IP via UDP socket trick
 
 # Streaming Configuration
 
 # Chunk size for streaming file reads/writes.
 # 1MB optimized for modern networks to reduce I/O syscall overhead.
-CHUNK_SIZE = 1024 * 1024
+CHUNK_SIZE = 256 * 1024  # Optimized for concurrency
 
 # Maximum size for multipart form headers before rejecting request.
 # Prevents memory exhaustion from malformed or malicious requests.

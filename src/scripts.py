@@ -306,6 +306,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (failedFiles.length === 0) {
           // All uploads succeeded - update file list via AJAX to preserve audio player
           refreshFileList();
+
+          // Auto-refresh file list after 1 second to show new file
+          setTimeout(() => {
+            location.reload();
+          }, 1000);
         } else {
           // Some uploads failed - show error
           if (uploadError) {
