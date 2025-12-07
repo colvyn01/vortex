@@ -627,18 +627,16 @@ def get_audio_player_html():
 
 <!-- Global style for container padding when mini-player active -->
 <style id="mini-player-styles">
-  /* Desktop: Add padding to device-shell to prevent content clipping */
-  @media (min-width: 900px) {
-    body.mini-player-active .device-shell {
-      padding-bottom: 80px !important;
-      transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+  /* Add padding to body to prevent content clipping behind viewport-attached mini-player */
+  body.mini-player-active {
+    padding-bottom: 56px !important;
+    transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
-  /* Mobile: Add padding to body for full-width mini-player */
+  /* Mobile: Account for safe-area-inset */
   @media (max-width: 899px) {
     body.mini-player-active {
-      padding-bottom: 80px !important;
+      padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
       transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
   }
@@ -1309,27 +1307,27 @@ html {
 
 .mini-player {
   position: fixed;
-  bottom: 1.5rem; /* Match app-root desktop padding */
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: 800px;
-  width: calc(100% - 3rem); /* Account for app-root padding (1.5rem × 2) */
-  height: 64px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56px;
   /* Glassmorphism effect - theme colors only, no saturation boost */
   background: rgba(232, 244, 241, 0.85); /* Cool off-white/teal tint */
   backdrop-filter: blur(12px); /* Remove saturate() to fix blue shift */
   -webkit-backdrop-filter: blur(12px); /* Safari support */
-  border: 1px solid rgba(0, 121, 107, 0.2); /* Translucent teal border */
+  border: none;
   border-top: 1px solid rgba(0, 121, 107, 0.3); /* Slightly stronger top border */
-  border-radius: 16px 16px 0 0;
+  border-radius: 0;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12); /* Pure black shadow only */
   z-index: 9999;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.5rem 1rem;
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.375rem 1rem;
+  padding-bottom: calc(0.375rem + env(safe-area-inset-bottom));
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity;
   contain: layout;
 }
 
@@ -1341,9 +1339,9 @@ html {
 }
 
 .mini-art {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
   border: 1px solid var(--border-color);
   object-fit: cover;
   flex-shrink: 0;
@@ -1356,17 +1354,18 @@ html {
 .mini-info {
   flex: 1;
   min-width: 0;
+  max-width: 300px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
 
 .mini-title {
   font-family: var(--font-ui);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.04em;
   color: var(--text-main);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1375,7 +1374,7 @@ html {
 
 .mini-artist {
   font-family: var(--font-ui);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 400;
   color: var(--text-dim);
   overflow: hidden;
@@ -1386,7 +1385,7 @@ html {
 .mini-controls {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   flex-shrink: 0;
 }
 
@@ -1394,8 +1393,8 @@ html {
   background: var(--surface-alt);
   border: 1px solid var(--border-color);
   border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1421,8 +1420,8 @@ html {
   background: var(--accent-color);
   border-color: var(--accent-hover);
   color: white;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
 }
 
 .mini-play-btn:hover {
@@ -1560,22 +1559,13 @@ html {
     height: 70px;
   }
 
-  /* Mobile mini-player: full-width with safe-area-inset */
+  /* Mobile mini-player: solid background for better readability */
   .mini-player {
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-width: none;
-    width: 100%;
-    transform: none;
     /* Mobile: Use solid background for better readability on small screens */
     background: var(--surface-color);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border: none;
-    border-top: 1px solid var(--border-color);
-    border-radius: 0;
-    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(0.375rem + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
   }
   
