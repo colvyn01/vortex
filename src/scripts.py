@@ -70,6 +70,11 @@ document.addEventListener('DOMContentLoaded', function() {
       // Ignore errors if upload form not initialized
     }
     
+    // Stop audio player using proper dismissal method
+    if (window.VortexAudioPlayer && typeof window.VortexAudioPlayer.dismiss === 'function') {
+      window.VortexAudioPlayer.dismiss();
+    }
+    
     // Hide stop button
     var stopBtn = document.getElementById('server-stop-btn');
     if (stopBtn) {
