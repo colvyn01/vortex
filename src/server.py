@@ -1369,9 +1369,17 @@ class VortexHandler(SimpleHTTPRequestHandler):
             self._send_error_safe(400, "Invalid Content-Length")
             return
 
+        # Determine upload target directory from request path
+        target_path = self.translate_path(parsed.path)
+
         # Security: Validate upload path is within base directory
-        if not self._is_request_path_safe(self.base_directory):
+        if not self._is_request_path_safe(target_path):
             self._send_error_safe(403, "Access denied")
+            return
+
+        # Ensure target is a directory
+        if not os.path.isdir(target_path):
+            self._send_error_safe(400, "Upload target must be a directory")
             return
 
         # Generate unique upload ID and register this upload
@@ -1380,7 +1388,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         # Stream upload to disk with termination checking
         try:
             result: UploadResult = parse_multipart_streaming(
-                self.rfile, length, boundary, self.base_directory,
+                self.rfile, length, boundary, target_path,
                 upload_id=upload_id,
                 termination_check=lambda: _server_terminating
             )
@@ -1398,10 +1406,10 @@ class VortexHandler(SimpleHTTPRequestHandler):
             self._send_error_safe(400, result.error_message or "Upload failed")
             return
 
-        # Redirect back to root after successful upload
+        # Redirect back to current directory after successful upload
         try:
             self.send_response(303)
-            self.send_header("Location", "/")
+            self.send_header("Location", clean_path)
             self.end_headers()
         except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             pass
