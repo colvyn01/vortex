@@ -498,6 +498,16 @@ def get_audio_player_html():
 <!-- Full Audio Player Modal -->
 <div id="audio-modal" class="audio-modal" style="display: none;">
   <div class="audio-player-container">
+    <!-- Corner button group -->
+    <div class="audio-corner-controls">
+      <button class="audio-minimize-btn" id="audio-minimize" aria-label="Minimize player" title="Minimize">
+        <span style="font-size: 1.2rem;">−</span>
+      </button>
+      <button class="audio-dismiss-btn" id="audio-dismiss" aria-label="Close player" title="Close">
+        <span style="font-size: 1.2rem;">×</span>
+      </button>
+    </div>
+
     <!-- Album Art Section (300x300px, immediate placeholder) -->
     <div class="album-art-section">
       <img id="album-art" class="album-art" width="300" height="300" alt="Album artwork" src="">
@@ -509,13 +519,6 @@ def get_audio_player_html():
         <div class="audio-artist" id="audio-artist"></div>
       </div>
     </div>
-    
-    <!-- Minimize Button -->
-    <button class="audio-close" id="audio-close" aria-label="Minimize to dock">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M19 9l-7 7-7-7"/>
-      </svg>
-    </button>
 
     <!-- LED VU Meter Visualizer (14 bars, logarithmic frequency mapping) -->
     <!-- Design Decision: 14 rectangular LED segments (not 12/16, not rounded).
@@ -787,32 +790,51 @@ html {
   white-space: nowrap;
 }
 
-.audio-close {
+/* Corner button container - top-right of player */
+.audio-corner-controls {
   position: absolute;
   top: 1rem;
   right: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 100;
+}
+
+/* Shared corner button styles */
+.audio-minimize-btn,
+.audio-dismiss-btn {
   background: rgba(0, 0, 0, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   cursor: pointer;
-  transition: all 0.2s;
-  z-index: 2;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.audio-close:hover {
+.audio-minimize-btn:hover {
+  background: var(--accent-color);
+  border-color: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.audio-dismiss-btn:hover {
   background: var(--error-color);
   border-color: var(--error-color);
-  transform: scale(1.1);
+  transform: scale(1.05);
 }
 
-.audio-close:active {
-  transform: translateY(1px) scale(1.05);
+.audio-minimize-btn:active,
+.audio-dismiss-btn:active {
+  transform: translateY(1px) scale(1.02);
 }
 
 /* ========================================
@@ -1035,6 +1057,43 @@ html {
   color: white;
 }
 
+/* Loop button specific embossed hover/active effect */
+#audio-loop:hover {
+  background: var(--accent-color);
+  border-color: var(--accent-hover);
+  color: white;
+  /* Subtle lift effect - embossed feel */
+  transform: translateY(-2px);
+  box-shadow: 
+    0 5px 0 rgba(0, 0, 0, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+#audio-loop:active {
+  /* Pressed button effect */
+  transform: translateY(2px);
+  box-shadow: 
+    0 1px 0 rgba(0, 0, 0, 0.25),
+    inset 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Maintain active state appearance when loop is on */
+#audio-loop[data-mode="1"]:hover,
+#audio-loop[data-mode="2"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 5px 0 rgba(0, 0, 0, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.4);
+}
+
+#audio-loop[data-mode="1"]:active,
+#audio-loop[data-mode="2"]:active {
+  transform: translateY(2px);
+  box-shadow: 
+    0 1px 0 rgba(0, 0, 0, 0.25),
+    inset 0 2px 3px rgba(0, 0, 0, 0.3);
+}
+
 .audio-play-btn {
   background: var(--accent-color);
   border: 1px solid var(--accent-hover);
@@ -1157,7 +1216,8 @@ html {
 /* Accessible keyboard navigation */
 .audio-btn:focus-visible,
 .audio-play-btn:focus-visible,
-.audio-close:focus-visible {
+.audio-minimize-btn:focus-visible,
+.audio-dismiss-btn:focus-visible {
   outline: 2px solid var(--accent-color);
   outline-offset: 3px;
 }
@@ -1465,6 +1525,18 @@ html {
     padding: 1.5rem;
   }
 
+  /* Mobile corner controls - smaller and tighter */
+  .audio-corner-controls {
+    gap: 0.25rem;
+  }
+
+  .audio-minimize-btn,
+  .audio-dismiss-btn {
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.75);
+  }
+
   .album-art-section {
     width: 250px;
     height: 250px;
@@ -1646,7 +1718,8 @@ def get_audio_player_js():
   const audioTitle = document.getElementById('audio-title');
   const audioArtist = document.getElementById('audio-artist');
   const artLoading = document.getElementById('art-loading');
-  const closeBtn = document.getElementById('audio-close');
+  const minimizeBtn = document.getElementById('audio-minimize');
+  const dismissBtn = document.getElementById('audio-dismiss');
   const playBtn = document.getElementById('audio-play');
   const playIcon = document.getElementById('play-icon');
   const pauseIcon = document.getElementById('pause-icon');
@@ -1717,6 +1790,17 @@ def get_audio_player_js():
   function isAudioFile(filename) {
     const lower = filename.toLowerCase();
     return AUDIO_EXTENSIONS.some(ext => lower.endsWith(ext));
+  }
+
+  /**
+   * Normalize loop mode to prevent stuck states.
+   * Ensures loopMode is always one of {0, 1, 2}.
+   */
+  function normalizeLoopMode() {
+    if (typeof loopMode !== 'number' || loopMode < 0 || loopMode > 2) {
+      loopMode = 0;
+    }
+    return loopMode;
   }
 
   // ========================================
@@ -1941,23 +2025,32 @@ def get_audio_player_js():
   }
 
   function playNext() {
+    normalizeLoopMode();
+    
+    // Repeat one: restart current track
     if (loopMode === 2) {
       audio.currentTime = 0;
-      audio.play();
+      audio.play().catch(err => console.error('Playback failed:', err));
       return;
     }
 
+    // Move to next track
     let nextIndex = currentTrackIndex + 1;
+    
+    // Handle end of playlist
     if (nextIndex >= currentPlaylist.length) {
       if (loopMode === 1) {
+        // Repeat all: wrap to first track
         nextIndex = 0;
       } else {
+        // Loop off: stop playback
         audio.pause();
         updatePlayPauseIcons(true);
         stopVUMeter();
         return;
       }
     }
+    
     playTrack(nextIndex);
   }
 
@@ -1970,9 +2063,14 @@ def get_audio_player_js():
   }
 
   function toggleLoop() {
+    // Cycle through modes: 0 -> 1 -> 2 -> 0
     loopMode = (loopMode + 1) % 3;
-    loopBtn.setAttribute('data-mode', loopMode);
+    normalizeLoopMode();
     
+    // Update visual state
+    loopBtn.setAttribute('data-mode', String(loopMode));
+    
+    // Update accessibility label
     const labels = ['Loop off', 'Loop all', 'Loop one'];
     loopBtn.setAttribute('aria-label', labels[loopMode]);
   }
@@ -1997,7 +2095,7 @@ def get_audio_player_js():
       document.body.classList.add('mini-player-active');
     }
 
-    // Reset controls to defaults on first open
+    // Reset controls to defaults on first open (preserve loop state)
     if (!audioSource) {
       const savedVolume = localStorage.getItem('vortex-audio-volume');
       const volume = savedVolume ? parseInt(savedVolume) : 80;
@@ -2021,8 +2119,12 @@ def get_audio_player_js():
       midVal.textContent = '0';
       trebleVal.textContent = '0';
 
-      loopMode = 0;
-      loopBtn.setAttribute('data-mode', '0');
+      // Only reset loop mode on very first initialization
+      if (typeof loopMode === 'undefined') {
+        loopMode = 0;
+      }
+      normalizeLoopMode();
+      loopBtn.setAttribute('data-mode', String(loopMode));
     }
 
     // Load playlist and play
@@ -2209,7 +2311,12 @@ def get_audio_player_js():
   // ========================================
 
   // Full modal controls
-  closeBtn.addEventListener('click', minimizePlayer);
+  if (minimizeBtn) {
+    minimizeBtn.addEventListener('click', minimizePlayer);
+  }
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', dismissPlayer);
+  }
   playBtn.addEventListener('click', togglePlayPause);
   prevBtn.addEventListener('click', playPrev);
   nextBtn.addEventListener('click', playNext);
