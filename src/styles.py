@@ -1361,10 +1361,13 @@ a:active {
   width: max-content;
 }
 
-#qr-code img {
+#qr-code img,
+#qr-code canvas {
   display: block;
   max-width: 100%;
   height: auto;
+  width: 128px !important;
+  height: 128px !important;
 }
 
 .qr-url {

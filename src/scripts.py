@@ -12,22 +12,25 @@ display and parallel multi-file uploads with progress tracking.
 JS_UPLOAD_HANDLER = """
 document.addEventListener('DOMContentLoaded', function() {
 	// Configuration
-	
+
 	// Theme Management
 	var themeToggle = document.getElementById('theme-toggle');
 	var root = document.documentElement;
 	var storedTheme = localStorage.getItem('theme');
 	var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-	
+
 	var currentTheme = storedTheme || systemTheme;
 	setTheme(currentTheme);
-	
+
 	function setTheme(theme) {
 		root.setAttribute('data-theme', theme);
 		localStorage.setItem('theme', theme);
 		updateThemeIcon(theme);
+		if (typeof generateQRCode === 'function') {
+			generateQRCode();
+		}
 	}
-	
+
 	function updateThemeIcon(theme) {
 		if (!themeToggle) return;
 		if (theme === 'dark') {
@@ -38,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			themeToggle.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
 		}
 	}
-	
+
 	if (themeToggle) {
 		themeToggle.addEventListener('click', function() {
 			var newTheme = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
@@ -1351,6 +1354,35 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 	/**
+	 * Generate QR code with theme-aware colors.
+	 */
+	function generateQRCode() {
+		if (!qrCode) return;
+		if (typeof QRCode === 'undefined') return;
+
+		qrCode.innerHTML = '';
+		qrCode.title = '';
+
+		var currentUrl = window.location.href;
+
+		var style = getComputedStyle(document.documentElement);
+		var fgColor = style.getPropertyValue('--text-main').trim();
+		var bgColor = style.getPropertyValue('--surface-main').trim();
+
+		if (!fgColor) fgColor = '#263238';
+		if (!bgColor) bgColor = '#ffffff';
+
+		new QRCode(qrCode, {
+			text: currentUrl,
+			width: 256,
+			height: 256,
+			colorDark: fgColor,
+			colorLight: "transparent",
+			correctLevel: QRCode.CorrectLevel.M
+		});
+	}
+
+	/**
 	 * Initialize QR code generation (desktop only).
 	 */
 	function initializeQRCode() {
@@ -1365,17 +1397,10 @@ document.addEventListener('DOMContentLoaded', function() {
 			return;
 		}
 
-		var currentUrl = window.location.href;
-
-		// Generate QR code with smaller size for calm aesthetic
-		new QRCode(qrCode, {
-			text: currentUrl,
-			width: 96,
-			height: 96
-		});
+		generateQRCode();
 
 		// Display URL text
-		qrUrlText.textContent = currentUrl;
+		qrUrlText.textContent = window.location.href;
 	}
 
 	/**
@@ -1395,7 +1420,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			})
 			.then(function(data) {
 				if (data.size) {
-					dirSizeInfo.textContent = 'Total: ' + data.size.total_formatted + 
+					dirSizeInfo.textContent = 'Total: ' + data.size.total_formatted +
 						' (' + data.size.file_count + ' files)';
 				}
 			})
