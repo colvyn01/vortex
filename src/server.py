@@ -1655,6 +1655,16 @@ def run_server(
 
     print("\nPress Ctrl+C to stop.")
 
+    # Open browser automatically for the host
+    import webbrowser
+
+    if use_token_auth and security_manager:
+        token = security_manager.get_token()
+        browser_url = f"{protocol}://{display_address}:{port}/?token={token}"
+    else:
+        browser_url = f"{protocol}://{display_address}:{port}/"
+    webbrowser.open(browser_url)
+
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
