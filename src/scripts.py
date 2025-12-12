@@ -1221,13 +1221,68 @@ document.addEventListener('DOMContentLoaded', function() {
 		var linkified = linkifyUrls(sanitized);
 		contentDiv.innerHTML = linkified;
 
+		// Create footer with timestamp and copy button
+		var footerDiv = document.createElement('div');
+		footerDiv.className = 'chat-footer';
+
 		var timeDiv = document.createElement('div');
 		timeDiv.className = 'chat-timestamp';
 		timeDiv.textContent = formatTime(message.timestamp);
 
+		// Copy button - copies plain text content
+		var copyBtn = document.createElement('button');
+		copyBtn.className = 'copy-button';
+		copyBtn.textContent = 'Copy';
+		copyBtn.title = 'Copy message';
+		copyBtn.onclick = function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			var textToCopy = message.content;
+
+			// Try modern clipboard API first, fallback to execCommand
+			function showSuccess() {
+				copyBtn.textContent = 'Copied';
+				copyBtn.classList.add('copied');
+				setTimeout(function() {
+					copyBtn.textContent = 'Copy';
+					copyBtn.classList.remove('copied');
+				}, 1500);
+			}
+
+			if (navigator.clipboard && window.isSecureContext) {
+				navigator.clipboard.writeText(textToCopy).then(showSuccess).catch(function() {
+					fallbackCopy(textToCopy, showSuccess);
+				});
+			} else {
+				fallbackCopy(textToCopy, showSuccess);
+			}
+		};
+
+		// Fallback copy using textarea and execCommand
+		function fallbackCopy(text, onSuccess) {
+			var textarea = document.createElement('textarea');
+			textarea.value = text;
+			textarea.style.position = 'fixed';
+			textarea.style.left = '-9999px';
+			textarea.style.top = '0';
+			document.body.appendChild(textarea);
+			textarea.focus();
+			textarea.select();
+			try {
+				document.execCommand('copy');
+				onSuccess();
+			} catch (err) {
+				console.error('Copy failed:', err);
+			}
+			document.body.removeChild(textarea);
+		}
+
+		footerDiv.appendChild(timeDiv);
+		footerDiv.appendChild(copyBtn);
+
 		messageDiv.appendChild(senderDiv);
 		messageDiv.appendChild(contentDiv);
-		messageDiv.appendChild(timeDiv);
+		messageDiv.appendChild(footerDiv);
 
 		chatMessages.appendChild(messageDiv);
 		chatMessages.scrollTop = chatMessages.scrollHeight;

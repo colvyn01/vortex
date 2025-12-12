@@ -1121,15 +1121,53 @@ a:active {
   text-decoration: none;
   opacity: 0.8;
 }
+/* chat footer (timestamp + copy button) */
+
+.chat-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.3rem;
+}
+
 /* chat timestamp */
 
 .chat-timestamp {
   font-size: 0.65rem;
   font-family: var(--font-ui);
   color: var(--text-dim);
-  margin-top: 0.3rem;
   text-align: left;
   letter-spacing: 0.3px;
+}
+
+/* copy button */
+
+.copy-button {
+  background: transparent;
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 0.55rem;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  padding: 0.15rem 0.35rem;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.copy-button:hover {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #ffffff;
+}
+
+.copy-button.copied {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: #ffffff;
 }
 /* chat form */
 
