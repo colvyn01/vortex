@@ -646,10 +646,6 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Returns:
             True if request is allowed, False if device is banned.
         """
-        # Skip ban check for host
-        if self._is_host():
-            return True
-
         # Get device_id from custom header or cookie
         device_id = self.headers.get("X-Device-ID")
         device_name = self.headers.get("X-Device-Name", "Unknown")
@@ -663,24 +659,24 @@ class VortexHandler(SimpleHTTPRequestHandler):
                     device_id = cookie.split("=", 1)[1]
                     break
 
-        # Check if device is banned
-        if device_id and device_id in _banned_devices:
-            self._send_error_safe(403, "Access denied: Device has been removed")
-            return False
-
-        # Register active device if we have device info
+        # Register active device if we have device info (do this for ALL devices including host)
         if device_id:
             # Extract session_id from path
             parsed = urlparse(self.path)
             query_params = parse_qs(parsed.query)
             session_id = query_params.get("session", [""])[0]
 
-            # If no session in query, try to get from request data for POST
-            if not session_id and self.command == "POST":
-                # We'll register it later in message handler
-                pass
-            elif session_id:
+            if session_id:
                 _register_active_device(device_id, device_name, session_id)
+
+        # Skip ban check for host (but device was already registered above)
+        if self._is_host():
+            return True
+
+        # Check if device is banned
+        if device_id and device_id in _banned_devices:
+            self._send_error_safe(403, "Access denied: Device has been removed")
+            return False
 
         return True
 
@@ -895,6 +891,12 @@ class VortexHandler(SimpleHTTPRequestHandler):
         if not session_id:
             self._send_error_safe(400, "Missing session parameter")
             return
+
+        # Register device from query params (EventSource can't send custom headers)
+        device_id = query_params.get("device_id", [""])[0]
+        device_name = query_params.get("device_name", ["Unknown"])[0]
+        if device_id and session_id:
+            _register_active_device(device_id, device_name, session_id)
 
         # Create queue for this client
         client_queue: queue.Queue = queue.Queue(maxsize=50)

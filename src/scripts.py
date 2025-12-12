@@ -128,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	// Handles uploading multiple files simultaneously with aggregate progress.
 
 	var uploadForm = document.querySelector('form[enctype="multipart/form-data"]');
-	
+
 	// Global upload tracking for abortion capability
 	var globalFileProgress = {};
 	var globalAbortAllUploads = function() {
@@ -236,7 +236,7 @@ document.addEventListener('DOMContentLoaded', function() {
 				formData.append('file', file);
 
 				var xhr = new XMLHttpRequest();
-				
+
 				// Store XHR reference for potential abortion
 				fileProgress[idx].xhr = xhr;
 
@@ -545,7 +545,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	function checkHostStatus() {
 		fetch('/api/host-status', {
 			headers: {
-				'X-Device-ID': DEVICE_ID
+				'X-Device-ID': DEVICE_ID,
+				'X-Device-Name': SENDER_NAME
 			}
 		})
 			.then(function(response) {
@@ -560,7 +561,7 @@ document.addEventListener('DOMContentLoaded', function() {
 						hostControls.style.display = 'flex';
 					}
 					initializeBannedDevicesUI();
-					
+
 					// Show stop button for host only
 					var stopBtn = document.getElementById('server-stop-btn');
 					if (stopBtn) {
@@ -591,7 +592,8 @@ document.addEventListener('DOMContentLoaded', function() {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'X-Device-ID': DEVICE_ID
+				'X-Device-ID': DEVICE_ID,
+				'X-Device-Name': SENDER_NAME
 			},
 			body: JSON.stringify({ device_id: deviceId })
 		})
@@ -615,7 +617,8 @@ document.addEventListener('DOMContentLoaded', function() {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'X-Device-ID': DEVICE_ID
+				'X-Device-ID': DEVICE_ID,
+				'X-Device-Name': SENDER_NAME
 			},
 			body: JSON.stringify({ device_id: deviceId })
 		})
@@ -640,7 +643,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		fetch('/api/banned-devices', {
 			headers: {
-				'X-Device-ID': DEVICE_ID
+				'X-Device-ID': DEVICE_ID,
+				'X-Device-Name': SENDER_NAME
 			}
 		})
 			.then(function(response) {
@@ -692,7 +696,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		fetch('/api/active-devices?session=' + encodeURIComponent(sessionId), {
 			headers: {
-				'X-Device-ID': DEVICE_ID
+				'X-Device-ID': DEVICE_ID,
+				'X-Device-Name': SENDER_NAME
 			}
 		})
 			.then(function(response) {
@@ -718,16 +723,20 @@ document.addEventListener('DOMContentLoaded', function() {
 					nameSpan.className = 'active-device-name';
 					nameSpan.textContent = device.device_name;
 
-					var kickBtn = document.createElement('button');
-					kickBtn.className = 'kick-button-inline';
-					kickBtn.textContent = 'Kick';
-					kickBtn.onclick = function() {
-						kickDevice(device.device_id, device.device_name);
-						setTimeout(loadActiveDevices, 500);
-					};
-
 					item.appendChild(nameSpan);
-					item.appendChild(kickBtn);
+
+					// Don't allow host to kick itself
+					if (device.device_id !== DEVICE_ID) {
+						var kickBtn = document.createElement('button');
+						kickBtn.className = 'kick-button-inline';
+						kickBtn.textContent = 'Kick';
+						kickBtn.onclick = function() {
+							kickDevice(device.device_id, device.device_name);
+							setTimeout(loadActiveDevices, 500);
+						};
+						item.appendChild(kickBtn);
+					}
+
 					activeList.appendChild(item);
 				});
 			})
@@ -864,13 +873,16 @@ document.addEventListener('DOMContentLoaded', function() {
 			eventSource.close();
 		}
 
-		var url = '/api/events?session=' + encodeURIComponent(sessionId);
+		// Include device info in URL since EventSource doesn't support custom headers
+		var url = '/api/events?session=' + encodeURIComponent(sessionId) +
+			'&device_id=' + encodeURIComponent(DEVICE_ID) +
+			'&device_name=' + encodeURIComponent(SENDER_NAME);
 		eventSource = new EventSource(url);
 
 		eventSource.onmessage = function(event) {
 			try {
 				var message = JSON.parse(event.data);
-				
+
 				// Check for server termination message
 				if (message.type === 'server_terminating') {
 					showTerminationMessage();
@@ -880,7 +892,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					}
 					return;
 				}
-				
+
 				// Handle upload progress updates (visible to host)
 				if (message.type === 'upload_progress') {
 					if (isHost) {
@@ -888,7 +900,7 @@ document.addEventListener('DOMContentLoaded', function() {
 					}
 					return;
 				}
-				
+
 				// Handle upload completion (visible to host)
 				if (message.type === 'upload_complete') {
 					if (isHost) {
@@ -896,9 +908,9 @@ document.addEventListener('DOMContentLoaded', function() {
 					}
 					return;
 				}
-				
+
 				renderMessage(message);
-				
+
 				// Update connection status
 				if (chatStatus) {
 					chatStatus.style.color = '#00cc00';
@@ -911,7 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		eventSource.onerror = function(error) {
 			console.error('SSE connection error:', error);
-			
+
 			// Update connection status
 			if (chatStatus) {
 				chatStatus.style.color = '#cc0000';
@@ -921,7 +933,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			// Close and attempt reconnect after delay
 			eventSource.close();
 			eventSource = null;
-			
+
 			if (!isKicked) {
 				setTimeout(connectEventSource, 5000);
 			}
@@ -940,7 +952,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	 */
 	function handleKicked() {
 		isKicked = true;
-		
+
 		// Stop SSE connection
 		if (eventSource) {
 			eventSource.close();
@@ -969,7 +981,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	 */
 	function showUploadProgress(message) {
 		var toast = document.getElementById('upload-progress-toast');
-		
+
 		// Create toast if it doesn't exist
 		if (!toast) {
 			toast = document.createElement('div');
@@ -988,20 +1000,20 @@ document.addEventListener('DOMContentLoaded', function() {
 			`;
 			document.body.appendChild(toast);
 		}
-		
+
 		// Update toast content
 		var deviceSpan = toast.querySelector('.upload-toast-device');
 		var filenameDiv = toast.querySelector('.upload-toast-filename');
 		var progressBar = toast.querySelector('.upload-toast-bar');
 		var progressText = toast.querySelector('.upload-toast-text');
-		
+
 		if (deviceSpan) deviceSpan.textContent = message.device_name + ' uploading';
 		if (filenameDiv) filenameDiv.textContent = message.filename;
 		if (progressBar) progressBar.style.width = message.percent + '%';
 		if (progressText) {
 			progressText.textContent = formatSize(message.bytes_uploaded) + ' / ' + formatSize(message.total_bytes) + ' (' + message.percent + '%)';
 		}
-		
+
 		// Show the toast
 		toast.classList.add('active');
 	}
@@ -1012,24 +1024,24 @@ document.addEventListener('DOMContentLoaded', function() {
 	 */
 	function handleUploadComplete(message) {
 		var toast = document.getElementById('upload-progress-toast');
-		
+
 		// Update toast to show completion briefly
 		if (toast) {
 			var progressBar = toast.querySelector('.upload-toast-bar');
 			var progressText = toast.querySelector('.upload-toast-text');
 			if (progressBar) progressBar.style.width = '100%';
 			if (progressText) progressText.textContent = 'Upload complete!';
-			
+
 			// Hide toast after 2 seconds
 			setTimeout(function() {
 				toast.classList.remove('active');
 			}, 2000);
 		}
-		
+
 		// Check if we're in the upload directory
 		var currentPath = window.location.pathname;
 		var uploadPath = message.upload_path;
-		
+
 		if (currentPath === uploadPath || currentPath === uploadPath + '/') {
 			// Same directory - just refresh file list
 			refreshFileListGlobal();
@@ -1144,7 +1156,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		var messageDiv = document.createElement('div');
 		messageDiv.className = 'chat-message';
-		
+
 		// Check by device_id for accurate identity matching
 		var isOwnMessage = message.device_id && message.device_id === DEVICE_ID;
 		if (isOwnMessage) {
@@ -1169,7 +1181,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		var contentDiv = document.createElement('div');
 		contentDiv.className = 'chat-content';
-		
+
 		// Sanitize and linkify content
 		var sanitized = escapeHtml(message.content);
 		var linkified = linkifyUrls(sanitized);
@@ -1232,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', function() {
 		}
 
 		var currentUrl = window.location.href;
-		
+
 		// Generate QR code with smaller size for calm aesthetic
 		new QRCode(qrCode, {
 			text: currentUrl,
