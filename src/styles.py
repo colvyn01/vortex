@@ -13,24 +13,72 @@ and responsive behavior for mobile devices.
 CSS_STYLESHEET = """
 /* css variables */
 :root {
-  /* colors */
-  --bg-color: #E8F4F1;
-  --surface-color: #FFFBF7;
-  --surface-alt: #F5F3F0;
-  --text-main: #212121;
-  --text-dim: #666666;
-  --accent-color: #00796B;
-  --accent-hover: #004D40;
-  --secondary-accent: #D84315;
+  /* colors - Soft Neutral-Cool Palette */
+  --bg-color: #F4F6F6;
+  --surface-color: #FFFFFF;
+  --surface-alt: #EFF2F2;
+  --surface-main: #FFFFFF;
+  --surface-input: #FCFCFC;
+  --surface-error: #FEF2F2;
+
+  --text-main: #263238;
+  --text-dim: #607D8B;
+  --text-secondary: #546E7A;
+  --text-inverse: #FFFFFF;
+
+  --accent-color: #00897B;
+  --accent-hover: #00695C;
+  --secondary-accent: #E64A19;
   --error-color: #C62828;
-  --accent-rgb: 0,121,107;
-  --secondary-accent-rgb: 216,67,21;
+  --success-color: #388E3C;
+  --offline-color: #D32F2F;
+
+  --accent-rgb: 0,137,123;
+  --secondary-accent-rgb: 230,74,25;
   --error-rgb: 198,40,40;
-  --border-color: #3E3E3E;
-  --border-light: #D0D0D0;
+
+  --border-color: #CFD8DC;
+  --border-light: #ECEFF1;
+  --border-dashed: #B0BEC5;
   --border-width: 1px;
   --radius: 8px;
   --font-ui: "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", "Monaco", monospace;
+
+  /* transition for theme switch */
+  --theme-transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dark Mode Overrides */
+[data-theme="dark"] {
+  --bg-color: #0A0A0A;
+  --surface-color: #121212;
+  --surface-alt: #1E1E1E;
+  --surface-main: #181818;
+  --surface-input: #262626;
+  --surface-error: #2A1212;
+
+  --text-main: #E0E0E0;
+  --text-dim: #9E9E9E;
+  --text-secondary: #B0BEC5;
+  --text-inverse: #FFFFFF;
+
+  --accent-color: #26A69A;
+  --accent-hover: #00897B;
+  --secondary-accent: #FF5722;
+  --success-color: #81C784;
+  --offline-color: #E57373;
+
+  --border-color: #333333;
+  --border-light: #424242;
+  --border-dashed: #555555;
+}
+
+body {
+  transition: var(--theme-transition);
+}
+
+.device-shell, .panel, .chat-messages, .active-devices-section, .banned-devices-section {
+  transition: var(--theme-transition);
 }
 
 /* reset */
@@ -138,10 +186,17 @@ body {
   justify-content: space-between;
 }
 
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .server-stop-btn {
   background: var(--secondary-accent);
   border: 1px solid var(--secondary-accent);
-  color: white;
+  color: var(--text-inverse);
   width: 24px;
   height: 24px;
   border-radius: 4px;
@@ -153,6 +208,30 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-dim);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--surface-alt);
+  color: var(--text-main);
+  border-color: var(--text-dim);
 }
 
 .device-header p {
@@ -244,7 +323,7 @@ body {
 .panel {
   border: var(--border-width) solid var(--border-color);
   border-radius: 10px;
-  background: #ffffff;
+  background: var(--surface-main);
   padding: 0.75rem 0.9rem;
   display: flex;
   flex-direction: column;
@@ -320,7 +399,7 @@ body {
 
 .file-button {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   border: var(--border-width) solid var(--border-color);
   border-radius: 8px;
   padding: 0.4rem;
@@ -365,14 +444,14 @@ body {
 .file-name {
   flex: 1;
   padding: 0 0.3rem;
-  border: 1px dashed #bbbbbb;
+  border: 1px dashed var(--border-dashed);
   border-radius: 8px;
   color: var(--text-dim);
   white-space: nowrap;
   font-size: 0.65rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: #fafafa;
+  background: var(--surface-input);
   min-height: 44px;
   display: block;
   line-height: 42px;
@@ -384,7 +463,7 @@ body {
 .btn {
   appearance: none;
   -webkit-appearance: none;
-  background: #ffffff;
+  background: var(--surface-main);
   border: var(--border-width) solid var(--border-color);
   border-radius: 8px;
   color: var(--text-main);
@@ -412,7 +491,7 @@ body {
 
 .btn:hover {
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   border-color: var(--accent-color);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -421,7 +500,7 @@ body {
   transform: translateY(1px);
   box-shadow: none;
   background: var(--accent-hover);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .btn:focus {
@@ -622,7 +701,7 @@ a:active {
   font-size: 0.7rem;
   display: none;
   padding: 0.4rem 0.6rem;
-  background: #fef2f2;
+  background: var(--surface-error);
   border-radius: 8px;
   border: 1px solid var(--error-color);
 }
@@ -657,12 +736,12 @@ a:active {
 
 #chat-status {
   font-size: 0.8rem;
-  color: #00cc00;
+  color: var(--success-color);
   animation: pulse 2s infinite;
 }
 
 #chat-status.offline {
-  color: #cc0000;
+  color: var(--offline-color);
 }
 
 @keyframes pulse {
@@ -703,7 +782,7 @@ a:active {
 }
 
 .chat-message-own {
-  background: #ffffff;
+  background: var(--surface-main);
   border-left-color: var(--accent-color);
   border-left-width: 3px;
 }
@@ -743,7 +822,7 @@ a:active {
 
 .kick-button:hover {
   background: var(--error-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -800,7 +879,7 @@ a:active {
 .btn-manage-devices:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -822,7 +901,7 @@ a:active {
 .btn-manage-bans:hover {
   background: var(--error-color);
   border-color: var(--error-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -858,7 +937,7 @@ a:active {
   align-items: center;
   padding: 0.4rem 0.6rem;
   background: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   border-bottom: var(--border-width) solid var(--accent-color);
   font-size: 0.65rem;
   font-weight: 800;
@@ -869,9 +948,9 @@ a:active {
 
 .active-close {
   background: transparent;
-  border: 1px solid #ffffff;
+  border: 1px solid var(--text-inverse);
   border-radius: 4px;
-  color: #ffffff;
+  color: var(--text-inverse);
   font-size: 1rem;
   font-weight: bold;
   line-height: 1;
@@ -882,7 +961,7 @@ a:active {
 }
 
 .active-close:hover {
-  background: #ffffff;
+  background: var(--surface-main);
   color: var(--accent-color);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -939,7 +1018,7 @@ a:active {
   font-size: 0.65rem;
   font-weight: 600;
   font-family: var(--font-ui);
-  color: #ffffff;
+  color: var(--text-inverse);
   background: var(--error-color);
   border: 1px solid var(--error-color);
   border-radius: 6px;
@@ -1013,7 +1092,7 @@ a:active {
 .banned-close:hover {
   background: var(--error-color);
   border-color: var(--error-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1082,7 +1161,7 @@ a:active {
 .unkick-button:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1161,13 +1240,13 @@ a:active {
 .copy-button:hover {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 
 .copy-button.copied {
   background: var(--accent-color);
   border-color: var(--accent-color);
-  color: #ffffff;
+  color: var(--text-inverse);
 }
 /* chat form */
 
@@ -1200,7 +1279,7 @@ a:active {
 #chat-input:focus {
   outline: none;
   border-color: var(--accent-color);
-  background: #ffffff;
+  background: var(--surface-main);
 }
 
 .btn-chat {
@@ -1214,11 +1293,11 @@ a:active {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   #chat-input {
     font-size: 16px;
   }
-  
+
   .chat-message {
     max-width: 100%;
   }
@@ -1228,7 +1307,7 @@ a:active {
 
 .termination-message {
   grid-column: 1 / -1;
-  background: white;
+  background: var(--surface-main);
   border: 2px solid var(--secondary-accent);
   border-radius: 16px;
   padding: 3rem;
@@ -1275,7 +1354,7 @@ a:active {
 #qr-code {
   border: 1px solid var(--border-light);
   padding: 0.3rem;
-  background: #ffffff;
+  background: var(--surface-main);
   border-radius: 8px;
   width: max-content;
 }
