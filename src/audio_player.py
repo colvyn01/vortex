@@ -1452,7 +1452,7 @@ html {
   object-fit: cover;
   flex-shrink: 0;
   /* Enhanced shadow for contrast against translucent background */
-  box-shadow: 
+  box-shadow:
     0 2px 6px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(255, 255, 255, 0.5);
 }
