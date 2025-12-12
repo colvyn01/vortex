@@ -11,44 +11,29 @@ and responsive behavior for mobile devices.
 """
 
 CSS_STYLESHEET = """
-/* Design System & CSS Variables */
-
+/* css variables */
 :root {
-  /* Color Palette - Science-Backed (Low Visual Fatigue) */
-  --bg-color: #E8F4F1;          /* Soft sage - desaturated, minimal eye strain */
-  --surface-color: #FFFBF7;      /* Warm off-white - reduces glare vs pure white */
-  --surface-alt: #F5F3F0;        /* Warm neutral for secondary surfaces */
-  --text-main: #212121;          /* Dark grey - softer than pure black, 4.5:1+ contrast */
-  --text-dim: #666666;           /* Mid-grey for secondary text */
-
-  /* Accent Colors - Vibrant but Safe */
-  --accent-color: #00796B;       /* Teal - lowest visual fatigue (NIH study) */
-  --accent-hover: #004D40;       /* Deep teal for hover states */
-  --secondary-accent: #D84315;   /* Burnt orange - use sparingly (10% UI) */
-  --error-color: #C62828;        /* Deep red - reserved for errors only */
-
-  /* RGB Values for RGBA */
+  /* colors */
+  --bg-color: #E8F4F1;
+  --surface-color: #FFFBF7;
+  --surface-alt: #F5F3F0;
+  --text-main: #212121;
+  --text-dim: #666666;
+  --accent-color: #00796B;
+  --accent-hover: #004D40;
+  --secondary-accent: #D84315;
+  --error-color: #C62828;
   --accent-rgb: 0,121,107;
   --secondary-accent-rgb: 216,67,21;
   --error-rgb: 198,40,40;
-
-  /* Borders - Industrial Definition */
-  --border-color: #3E3E3E;       /* Charcoal - maintains sharpness without harshness */
-  --border-light: #D0D0D0;       /* Softer border for secondary elements */
+  --border-color: #3E3E3E;
+  --border-light: #D0D0D0;
   --border-width: 1px;
-
-  /* Spacing & Sizing */
   --radius: 8px;
-
-  /* Typography */
-  /* Unified font stack for consistent Teenage Engineering-inspired industrial aesthetic.
-     IBM Plex Mono provides a clean, technical feel; falls back to system monospace fonts. */
   --font-ui: "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", "Monaco", monospace;
 }
 
-
-/* Reset & Base Styles */
-
+/* reset */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -89,9 +74,7 @@ body {
   padding: 0.75rem;
 }
 
-
-/* Layout Container (Device Shell) */
-
+/* device shell */
 .device-shell {
   background: var(--surface-color);
   border: var(--border-width) solid var(--border-color);
@@ -104,7 +87,7 @@ body {
   overflow: hidden;
 }
 
-/* Desktop Layout */
+/* desktop layout */
 @media (min-width: 900px) {
   body {
     align-items: center;
@@ -119,7 +102,7 @@ body {
   }
 }
 
-/* Mobile Layout */
+/* mobile layout */
 @media (max-width: 600px) {
   body {
     background-size: 16px 16px;
@@ -135,9 +118,7 @@ body {
   }
 }
 
-
-/* Header */
-
+/* header */
 .device-header {
   padding: 0.9rem 1rem 0.4rem;
   border-bottom: var(--border-width) solid var(--border-color);
@@ -181,9 +162,7 @@ body {
   font-family: var(--font-ui);
 }
 
-
-/* Subheader / Path Bar */
-
+/* subheader path bar */
 .device-subheader {
   padding: 0.4rem 1rem;
   border-bottom: 1px solid var(--border-color);
@@ -202,9 +181,7 @@ body {
   text-overflow: ellipsis;
 }
 
-
-/* Main Content Area */
-
+/* main content area */
 .device-main {
   padding: 0.8rem 1rem 0.8rem;
   display: grid;
@@ -230,14 +207,14 @@ body {
   min-width: 0;
 }
 
-/* Medium screens: Adjust proportions */
+/* medium screens */
 @media (max-width: 1200px) and (min-width: 901px) {
   .device-main {
     grid-template-columns: 1.5fr 1fr 1fr;
   }
 }
 
-/* Tablet/Mobile: Stack columns */
+/* tablet and mobile */
 @media (max-width: 900px) {
   .device-main {
     grid-template-columns: 1fr;
@@ -245,25 +222,24 @@ body {
     grid-auto-rows: auto;
   }
 
-  /* Upload panel appears first on mobile */
+
   .panel-upload {
     order: -1;
     grid-area: upload;
   }
-  
+
   .panel-files {
     order: 0;
     grid-area: files;
   }
-  
+
   .panel-chat {
     order: 1;
     grid-area: chat;
   }
 }
 
-
-/* Panel Component */
+/* panel */
 
 .panel {
   border: var(--border-width) solid var(--border-color);
@@ -313,8 +289,7 @@ body {
   text-overflow: ellipsis;
 }
 
-
-/* File Input & Upload Controls */
+/* file input */
 
 .upload-row {
   display: flex;
@@ -322,8 +297,6 @@ body {
   align-items: stretch;
   gap: 0.25rem;
 }
-
-/* Custom File Input */
 
 .file-input {
   position: relative;
@@ -342,7 +315,7 @@ body {
   opacity: 0;
   cursor: pointer;
   -webkit-appearance: none;
-  font-size: 16px; /* Prevents iOS zoom on focus */
+  font-size: 16px;
 }
 
 .file-button {
@@ -406,8 +379,7 @@ body {
   min-width: 0;
 }
 
-
-/* Buttons */
+/* buttons */
 
 .btn {
   appearance: none;
@@ -468,8 +440,7 @@ body {
   transform: none;
   box-shadow: none;
 }
-
-/* Download All Button */
+/* download button */
 
 .btn-download {
   display: inline-flex;
@@ -481,8 +452,7 @@ body {
   padding: 0.35rem 0.6rem;
   min-height: 36px;
 }
-
-/* Mobile Button Adjustments */
+/* mobile buttons */
 
 @media (max-width: 600px) {
   .upload-row {
@@ -509,8 +479,7 @@ body {
   }
 }
 
-
-/* File List Table */
+/* file list */
 
 .file-list {
   border-top: 1px solid var(--border-color);
@@ -566,8 +535,7 @@ td a {
   text-overflow: ellipsis;
 }
 
-
-/* Links */
+/* links */
 
 a {
   color: var(--accent-color);
@@ -585,8 +553,7 @@ a:active {
   color: var(--accent-hover);
   opacity: 0.8;
 }
-
-/* Mobile Table Adjustments */
+/* mobile table */
 
 @media (max-width: 600px) {
   table {
@@ -602,7 +569,7 @@ a:active {
     font-size: 0.55rem;
   }
 
-  /* Larger touch targets on mobile */
+
   td a {
     padding: 0.35rem 0;
     min-height: 38px;
@@ -611,8 +578,7 @@ a:active {
   }
 }
 
-
-/* Upload Progress Indicator */
+/* upload progress */
 
 .upload-progress {
   display: none;
@@ -648,8 +614,7 @@ a:active {
   color: var(--text-secondary);
 }
 
-
-/* Error Messages */
+/* error messages */
 
 .upload-error {
   color: var(--error-color);
@@ -666,8 +631,7 @@ a:active {
   display: block;
 }
 
-
-/* Chat Panel */
+/* chat panel */
 
 .panel-chat {
   display: flex;
@@ -705,8 +669,7 @@ a:active {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
-
-/* Chat Messages - Terminal Log Style */
+/* chat messages */
 
 .chat-messages {
   flex: 1;
@@ -728,8 +691,7 @@ a:active {
 .chat-messages::-webkit-scrollbar {
   display: none;
 }
-
-/* Chat Message - System Log Entry Style */
+/* chat message */
 
 .chat-message {
   padding: 0.5rem 0.6rem;
@@ -745,8 +707,7 @@ a:active {
   border-left-color: var(--accent-color);
   border-left-width: 3px;
 }
-
-/* Chat Sender - Terminal Prompt Style */
+/* chat sender */
 
 .chat-sender {
   font-size: 0.65rem;
@@ -761,8 +722,7 @@ a:active {
 .chat-message-own .chat-sender {
   color: var(--accent-color);
 }
-
-/* Kick Button - Host Controls */
+/* kick button */
 
 .kick-button {
   display: inline-block;
@@ -801,8 +761,7 @@ a:active {
   outline-offset: 2px;
   box-shadow: none;
 }
-
-/* Chat Disconnected State */
+/* chat disabled */
 
 .chat-form input:disabled {
   opacity: 0.6;
@@ -812,8 +771,7 @@ a:active {
 .chat-form input:disabled::placeholder {
   color: var(--error-color);
 }
-
-/* Host Controls Container */
+/* host controls */
 
 .host-controls {
   display: none;
@@ -882,8 +840,7 @@ a:active {
   outline-offset: 2px;
   box-shadow: none;
 }
-
-/* Active Devices Section */
+/* active devices */
 
 .active-devices-section {
   background: var(--surface-main);
@@ -1013,8 +970,7 @@ a:active {
   outline-offset: 2px;
   box-shadow: none;
 }
-
-/* Banned Devices Section */
+/* banned devices */
 
 .banned-devices-section {
   background: var(--surface-main);
@@ -1144,8 +1100,7 @@ a:active {
   outline-offset: 2px;
   box-shadow: none;
 }
-
-/* Chat Content - Monospace Data */
+/* chat content */
 
 .chat-content {
   font-family: var(--font-ui);
@@ -1166,8 +1121,7 @@ a:active {
   text-decoration: none;
   opacity: 0.8;
 }
-
-/* Chat Timestamp - Technical Readout */
+/* chat timestamp */
 
 .chat-timestamp {
   font-size: 0.65rem;
@@ -1177,16 +1131,14 @@ a:active {
   text-align: left;
   letter-spacing: 0.3px;
 }
-
-/* Chat Form - Command Line Style */
+/* chat form */
 
 .chat-form {
   display: flex;
   gap: 0.5rem;
   align-items: stretch;
 }
-
-/* Chat Input - Terminal Input Field */
+/* chat input */
 
 #chat-input {
   flex: 1;
@@ -1226,7 +1178,7 @@ a:active {
   }
   
   #chat-input {
-    font-size: 16px; /* Prevent iOS zoom */
+    font-size: 16px;
   }
   
   .chat-message {
@@ -1234,8 +1186,7 @@ a:active {
   }
 }
 
-
-/* Server Termination Message */
+/* termination message */
 
 .termination-message {
   grid-column: 1 / -1;
@@ -1259,8 +1210,7 @@ a:active {
   }
 }
 
-
-/* QR Code Container */
+/* qr code */
 
 .qr-code-container {
   display: flex;
@@ -1314,8 +1264,7 @@ a:active {
   }
 }
 
-
-/* Directory Size Info */
+/* directory size */
 
 #dir-size-info {
   font-family: var(--font-ui);
@@ -1324,8 +1273,7 @@ a:active {
   white-space: nowrap;
 }
 
-
-/* Upload Progress Toast (Host View) */
+/* upload toast */
 
 .upload-toast {
   position: fixed;
@@ -1419,9 +1367,7 @@ a:active {
   }
 }
 
-
-/* Universal Button State Rules - Hardware Aesthetic */
-/* Default and active states have no shadow, hover has subtle depth */
+/* button state overrides */
 
 button,
 input[type="submit"],
@@ -1477,7 +1423,6 @@ input[type="reset"]:focus,
   box-shadow: none !important;
 }
 
-/* Only show outline on keyboard focus - no glow */
 button:focus-visible,
 input[type="submit"]:focus-visible,
 input[type="button"]:focus-visible,

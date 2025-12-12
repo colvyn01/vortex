@@ -141,9 +141,9 @@ def _register_active_device(device_id: str, device_name: str, session_id: str) -
     Register or update an active device.
 
     Args:
-                                                                                                                                                                                                                                                                    device_id: Unique device identifier.
-                                                                                                                                                                                                                                                                    device_name: Human-readable device name.
-                                                                                                                                                                                                                                                                    session_id: Current session identifier.
+        device_id: Unique device identifier.
+        device_name: Human-readable device name.
+        session_id: Current session identifier.
     """
     _active_devices[device_id] = {
         "device_name": device_name,
@@ -160,10 +160,10 @@ def _get_active_devices(session_id: str) -> List[Dict[str, Any]]:
     Filters out devices inactive for more than 60 seconds.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
+        session_id: Session identifier.
 
     Returns:
-                                                                                                                                                                                                                                                                    List of active device dictionaries.
+        List of active device dictionaries.
     """
     now = time.time()
     cutoff = now - 60  # 60 second timeout
@@ -186,10 +186,10 @@ def _get_session_id(directory_path: str) -> str:
     Generate a stable session ID from directory path.
 
     Args:
-                                                                                                                                                                                                                                                                    directory_path: Absolute path to the directory being served.
+        directory_path: Absolute path to the directory being served.
 
     Returns:
-                                                                                                                                                                                                                                                                    MD5 hash of the directory path as session identifier.
+        MD5 hash of the directory path as session identifier.
     """
     return md5(directory_path.encode()).hexdigest()[:16]
 
@@ -202,7 +202,7 @@ def _cleanup_old_messages(session_id: str) -> None:
     trims to MAX_MESSAGES_PER_SESSION.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier to clean up.
+        session_id: Session identifier to clean up.
     """
     if session_id not in _chat_sessions:
         return
@@ -227,13 +227,13 @@ def _add_message(
     Add a message to a chat session.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
-                                                                                                                                                                                                                                                                    sender: Name/ID of the message sender.
-                                                                                                                                                                                                                                                                    content: Message text content.
-                                                                                                                                                                                                                                                                    device_id: Optional unique device identifier.
+        session_id: Session identifier.
+        sender: Name/ID of the message sender.
+        content: Message text content.
+        device_id: Optional unique device identifier.
 
     Returns:
-                                                                                                                                                                                                                                                                    The created message dictionary.
+        The created message dictionary.
     """
     if session_id not in _chat_sessions:
         _chat_sessions[session_id] = []
@@ -265,8 +265,8 @@ def _broadcast_message_to_sse(session_id: str, message: Dict[str, Any]) -> None:
     Broadcast a new message to all SSE clients for a session.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
-                                                                                                                                                                                                                                                                    message: Message dictionary to broadcast.
+        session_id: Session identifier.
+        message: Message dictionary to broadcast.
     """
     with _sse_lock:
         if session_id not in _sse_queues:
@@ -291,8 +291,8 @@ def _register_sse_client(session_id: str, client_queue: queue.Queue) -> None:
     Register a new SSE client for a session.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
-                                                                                                                                                                                                                                                                    client_queue: Queue for sending messages to this client.
+        session_id: Session identifier.
+        client_queue: Queue for sending messages to this client.
     """
     with _sse_lock:
         if session_id not in _sse_queues:
@@ -305,8 +305,8 @@ def _unregister_sse_client(session_id: str, client_queue: queue.Queue) -> None:
     Unregister an SSE client.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
-                                                                                                                                                                                                                                                                    client_queue: Queue to remove.
+        session_id: Session identifier.
+        client_queue: Queue to remove.
     """
     with _sse_lock:
         if session_id in _sse_queues and client_queue in _sse_queues[session_id]:
@@ -380,11 +380,11 @@ def _get_messages(
     Get messages from a chat session.
 
     Args:
-                                                                                                                                                                                                                                                                    session_id: Session identifier.
-                                                                                                                                                                                                                                                                    since_id: Optional message ID to get messages after.
+        session_id: Session identifier.
+        since_id: Optional message ID to get messages after.
 
     Returns:
-                                                                                                                                                                                                                                                                    List of message dictionaries.
+        List of message dictionaries.
     """
     if session_id not in _chat_sessions:
         return []
@@ -414,10 +414,10 @@ def _calculate_directory_size(directory_path: str) -> Dict[str, Any]:
     for SIZE_CACHE_DURATION to avoid expensive recalculation.
 
     Args:
-                                                                                                                                                                                                                                                                    directory_path: Path to directory to calculate.
+        directory_path: Path to directory to calculate.
 
     Returns:
-                                                                                                                                                                                                                                                                    Dictionary with size information.
+        Dictionary with size information.
     """
     # Check cache first
     now = time.time()
@@ -473,8 +473,8 @@ class PooledHTTPServer(HTTPServer):
     high throughput for file transfers.
 
     Attributes:
-                                                                                                                                                                                                                                                                    executor: Thread pool for handling requests.
-                                                                                                                                                                                                                                                                    allow_reuse_address: Enables socket reuse to avoid bind errors.
+        executor: Thread pool for handling requests.
+        allow_reuse_address: Enables socket reuse to avoid bind errors.
     """
 
     def __init__(
@@ -487,9 +487,9 @@ class PooledHTTPServer(HTTPServer):
         Initialize the pooled HTTP server.
 
         Args:
-                                                                                                                                                                                                                                                                        server_address: Tuple of (host, port) to bind to.
-                                                                                                                                                                                                                                                                        RequestHandlerClass: Handler class for processing requests.
-                                                                                                                                                                                                                                                                        max_workers: Maximum concurrent connections (default: 100).
+            server_address: Tuple of (host, port) to bind to.
+            RequestHandlerClass: Handler class for processing requests.
+            max_workers: Maximum concurrent connections (default: 100).
         """
         super().__init__(server_address, RequestHandlerClass)
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -543,20 +543,20 @@ class VortexHandler(SimpleHTTPRequestHandler):
     HTTP request handler for serving files and accepting uploads.
 
     Features:
-                                                                                                                                                                                                                                                                    - HTTP Range requests for media seeking and download resumption
-                                                                                                                                                                                                                                                                    - Chunked file streaming for memory-efficient large transfers
-                                                                                                                                                                                                                                                                    - Comprehensive MIME type detection
-                                                                                                                                                                                                                                                                    - Proper caching headers (ETag, Last-Modified, Cache-Control)
-                                                                                                                                                                                                                                                                    - Security headers (X-Content-Type-Options, X-Frame-Options, CSP)
-                                                                                                                                                                                                                                                                    - Path traversal protection
-                                                                                                                                                                                                                                                                    - Rate limiting and optional authentication
-                                                                                                                                                                                                                                                                    - Robust error handling for network and filesystem errors
+        - HTTP Range requests for media seeking and download resumption
+        - Chunked file streaming for memory-efficient large transfers
+        - Comprehensive MIME type detection
+        - Proper caching headers (ETag, Last-Modified, Cache-Control)
+        - Security headers (X-Content-Type-Options, X-Frame-Options, CSP)
+        - Path traversal protection
+        - Rate limiting and optional authentication
+        - Robust error handling for network and filesystem errors
 
     Attributes:
-                                                                                                                                                                                                                                                                    base_directory: Root directory being served (absolute path).
-                                                                                                                                                                                                                                                                    protocol_version: HTTP/1.1 for persistent connections.
-                                                                                                                                                                                                                                                                    security_manager: Optional security manager for auth/rate limiting.
-                                                                                                                                                                                                                                                                    is_https: Whether connection is using HTTPS.
+        base_directory: Root directory being served (absolute path).
+        protocol_version: HTTP/1.1 for persistent connections.
+        security_manager: Optional security manager for auth/rate limiting.
+        is_https: Whether connection is using HTTPS.
     """
 
     base_directory: str
@@ -574,7 +574,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Initialize the request handler.
 
         Args:
-                                                                                                                                                                                                                                                                        directory: Directory to serve. Defaults to current directory.
+            directory: Directory to serve. Defaults to current directory.
         """
         if directory is None:
             directory = os.getcwd()
@@ -621,7 +621,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         - Request from the server's own display address
 
         Returns:
-                                                                                                                                                                                                                                                                        True if request is from host, False otherwise.
+            True if request is from host, False otherwise.
         """
         client_ip = self.client_address[0]
 
@@ -644,7 +644,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Also registers active devices for tracking.
 
         Returns:
-                                                                                                                                                                                                                                                                        True if request is allowed, False if device is banned.
+            True if request is allowed, False if device is banned.
         """
         # Skip ban check for host
         if self._is_host():
@@ -689,7 +689,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Validate request against security manager.
 
         Returns:
-                                                                                                                                                                                                                                                                        True if request is allowed, False if blocked (error sent).
+            True if request is allowed, False if blocked (error sent).
         """
         if not self.security_manager:
             return True
@@ -726,10 +726,10 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Prevents directory traversal attacks using "../" or symlinks.
 
         Args:
-                                                                                                                                                                                                                                                                        path: The filesystem path to validate.
+            path: The filesystem path to validate.
 
         Returns:
-                                                                                                                                                                                                                                                                        True if the path is safe, False otherwise.
+            True if the path is safe, False otherwise.
         """
         return is_path_safe(Path(path), Path(self.base_directory))
 
@@ -784,8 +784,8 @@ class VortexHandler(SimpleHTTPRequestHandler):
         (not recursive) and streams it to the client.
 
         Args:
-                                                                                                                                                                                                                                                                        dir_path: Path to the directory to zip.
-                                                                                                                                                                                                                                                                        include_body: Whether to include body (False for HEAD requests).
+            dir_path: Path to the directory to zip.
+            include_body: Whether to include body (False for HEAD requests).
         """
         directory = Path(dir_path)
         dir_name = directory.name or "download"
@@ -842,12 +842,12 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Stream a file range to the client in chunks.
 
         Args:
-                                                                                                                                                                                                                                                                        file_path: Path to the file to stream.
-                                                                                                                                                                                                                                                                        start: Starting byte position.
-                                                                                                                                                                                                                                                                        end: Ending byte position (inclusive).
+            file_path: Path to the file to stream.
+            start: Starting byte position.
+            end: Ending byte position (inclusive).
 
         Returns:
-                                                                                                                                                                                                                                                                        True if streaming completed successfully, False otherwise.
+            True if streaming completed successfully, False otherwise.
         """
         bytes_to_send = end - start + 1
 
@@ -1114,7 +1114,7 @@ class VortexHandler(SimpleHTTPRequestHandler):
         Only the host can stop the server.
 
         Response:
-                                                                                                                                                                                                                                                                        {"success": true, "message": "Server stopping..."}
+            {"success": true, "message": "Server stopping..."}
         """
         # Only host can stop the server
         if not self._is_host():
@@ -1494,15 +1494,15 @@ def get_local_ip(mode: str = "auto") -> Tuple[str, str]:
     Detect the appropriate server address based on mode.
 
     Args:
-                                                                                                                                                                                                                                                                    mode: Address detection mode.
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    - 'auto': Intelligent detection (try LAN, fallback to localhost)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    - 'localhost': Force localhost only (127.0.0.1)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    - 'lan': Force LAN detection (fail if no LAN found)
+        mode: Address detection mode.
+            - 'auto': Intelligent detection (try LAN, fallback to localhost)
+            - 'localhost': Force localhost only (127.0.0.1)
+            - 'lan': Force LAN detection (fail if no LAN found)
 
     Returns:
-                                                                                                                                                                                                                                                                    Tuple of (bind_address, display_address).
-                                                                                                                                                                                                                                                                    bind_address is always '0.0.0.0' for accepting connections.
-                                                                                                                                                                                                                                                                    display_address is the user-facing IP for sharing.
+        Tuple of (bind_address, display_address).
+        bind_address is always '0.0.0.0' for accepting connections.
+        display_address is the user-facing IP for sharing.
     """
     bind_address = "0.0.0.0"
 
@@ -1556,13 +1556,13 @@ def run_server(
     Start the Vortex HTTP server.
 
     Args:
-                                                                                                                                                                                                                                                                    directory: Path to the directory to serve.
-                                                                                                                                                                                                                                                                    port: Port number to listen on.
-                                                                                                                                                                                                                                                                    max_parallel: Max parallel uploads hint for browser (unused server-side).
-                                                                                                                                                                                                                                                                    address_mode: Address detection mode ('auto', 'localhost', 'lan').
-                                                                                                                                                                                                                                                                    use_https: Enable HTTPS with self-signed certificate.
-                                                                                                                                                                                                                                                                    use_token_auth: Require token authentication for all requests.
-                                                                                                                                                                                                                                                                    regenerate_token: Generate a new authentication token.
+        directory: Path to the directory to serve.
+        port: Port number to listen on.
+        max_parallel: Max parallel uploads hint for browser (unused server-side).
+        address_mode: Address detection mode ('auto', 'localhost', 'lan').
+        use_https: Enable HTTPS with self-signed certificate.
+        use_token_auth: Require token authentication for all requests.
+        regenerate_token: Generate a new authentication token.
 
     The server uses a thread pool to handle multiple concurrent connections
     efficiently, with limits to prevent resource exhaustion.
