@@ -842,7 +842,7 @@ html {
   cursor: pointer;
   font-family: var(--font-ui);
   font-weight: 600;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   text-decoration: none;
@@ -888,7 +888,7 @@ html {
   justify-content: center;
   color: white;
   text-decoration: none;
-  transition: transform 0.15s ease, background 0.15s ease;
+  transition: transform 0.1s ease, background 0.1s ease;
 }
 
 .mini-download-btn:hover {
@@ -1283,7 +1283,7 @@ html {
   border-radius: 6px;
   color: var(--text-dim);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow:
     0 2px 0 rgba(0, 0, 0, 0.2),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);

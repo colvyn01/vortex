@@ -38,7 +38,7 @@ CSS_STYLESHEET = """
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  transition: border-radius 0.3s ease, border-width 0.3s ease;
+
 }
 
 html,
@@ -339,7 +339,7 @@ body {
   white-space: nowrap;
   font-family: var(--font-ui);
   box-shadow: none;
-  transition: background 0.05s ease, transform 0.05s ease;
+  transition: background 0.1s ease, transform 0.1s ease;
 }
 
 .file-button:hover {
@@ -394,7 +394,7 @@ body {
   text-transform: uppercase;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.05s ease, color 0.05s ease, border-color 0.05s ease, transform 0.05s ease;
+  transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -737,7 +737,7 @@ a:active {
   border-radius: 6px;
   cursor: pointer;
   line-height: 1;
-  transition: background 0.05s ease, color 0.05s ease, transform 0.05s ease;
+  transition: background 0.1s ease, color 0.1s ease, transform 0.1s ease;
   box-shadow: none;
 }
 
@@ -793,7 +793,7 @@ a:active {
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: background 0.05s ease, color 0.05s ease, border-color 0.05s ease, transform 0.05s ease;
+  transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
   box-shadow: none;
 }
 
@@ -877,7 +877,7 @@ a:active {
   line-height: 1;
   padding: 0 0.3rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow: none;
 }
 
@@ -946,7 +946,7 @@ a:active {
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow: none;
 }
 
@@ -1006,7 +1006,7 @@ a:active {
   line-height: 1;
   padding: 0 0.3rem;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow: none;
 }
 
@@ -1075,7 +1075,7 @@ a:active {
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   box-shadow: none;
 }
 
@@ -1154,7 +1154,7 @@ a:active {
   letter-spacing: 0.3px;
   cursor: pointer;
   padding: 0.15rem 0.35rem;
-  transition: all 0.15s ease;
+  transition: all 0.1s ease;
   line-height: 1;
 }
 
