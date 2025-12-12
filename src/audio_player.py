@@ -628,6 +628,24 @@ def get_audio_player_html():
         <input type="range" id="audio-treble" min="-12" max="12" value="0" step="1">
         <span id="audio-treble-val">0</span>
       </div>
+
+      <!-- Reverb -->
+      <div class="audio-control-group">
+        <label for="audio-reverb">REVERB</label>
+        <input type="range" id="audio-reverb" min="0" max="100" value="0" step="1">
+        <span id="audio-reverb-val">0%</span>
+      </div>
+    </div>
+
+    <!-- Reset Button Container -->
+    <div class="audio-reset-container">
+      <button id="audio-reset-btn" class="audio-reset-btn" aria-label="Reset all controls">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        RESET
+      </button>
     </div>
 
     <!-- Playlist -->
@@ -1243,6 +1261,51 @@ html {
   letter-spacing: 0.05em;
 }
 
+/* Reset button container */
+.audio-reset-container {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.audio-reset-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 0.6rem 1.5rem;
+  background: rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.audio-reset-btn:hover {
+  background: var(--accent-color);
+  border-color: var(--accent-hover);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow:
+    0 3px 0 rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.audio-reset-btn:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.2),
+    inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
 /* ========================================
    FULL PLAYER FOCUS STATES (Remove Blue Glow)
    ======================================== */
@@ -1343,7 +1406,7 @@ html {
    Design Decision: Hide visualizer in mini mode.
    Rationale: 64px height insufficient for meaningful
    display, battery savings prioritized over non-functional decoration.
-   
+
    Desktop (≥900px): Centered within app-root bounds, respects device-shell aesthetic.
    Mobile (<900px): Full-width with safe-area-inset for notch/home indicator.
    ======================================== */
@@ -1723,6 +1786,12 @@ def get_audio_player_js():
   let trebleNode = null;
   let analyserNode = null;
   
+  // Reverb effect nodes
+  let reverbNode = null;      // ConvolverNode for reverb
+  let reverbGainNode = null;  // Wet signal gain
+  let dryGainNode = null;     // Dry signal gain
+  let reverbBuffer = null;    // Impulse response buffer
+  
   // Tempo control
   let currentTempo = 1.0;     // playback rate (1.0 = normal)
 
@@ -1772,6 +1841,8 @@ def get_audio_player_js():
   const midVal = document.getElementById('audio-mid-val');
   const trebleSlider = document.getElementById('audio-treble');
   const trebleVal = document.getElementById('audio-treble-val');
+  const reverbSlider = document.getElementById('audio-reverb');
+  const reverbVal = document.getElementById('audio-reverb-val');
   const playlistEl = document.getElementById('audio-playlist');
   const vuMeter = document.getElementById('vu-meter');
   const vuBars = Array.from(vuMeter.querySelectorAll('.vu-bar'));
@@ -1793,6 +1864,9 @@ def get_audio_player_js():
   // Download buttons
   const miniDownloadBtn = document.getElementById('mini-download');
   const audioDownloadBtn = document.getElementById('audio-download');
+
+  // Reset button
+  const resetBtn = document.getElementById('audio-reset-btn');
 
   // ========================================
   // UTILITY FUNCTIONS
@@ -1865,8 +1939,44 @@ def get_audio_player_js():
     trebleNode.type = 'highshelf';
     trebleNode.frequency.value = 3000;
     
+    // Initialize reverb nodes
+    reverbNode = audioContext.createConvolver();
+    reverbGainNode = audioContext.createGain();
+    dryGainNode = audioContext.createGain();
+    
+    // Start with no reverb (dry = 1, wet = 0)
+    reverbGainNode.gain.value = 0;
+    dryGainNode.gain.value = 1;
+    
+    // Generate synthetic impulse response for reverb (2 second hall reverb)
+    createReverbImpulse(2.0, 2.5);
+    
     // Initialize tempo state
     currentTempo = 1.0;
+  }
+  
+  /**
+   * Create a synthetic impulse response for reverb effect.
+   * Uses exponential decay with noise to simulate a reverb tail.
+   */
+  function createReverbImpulse(duration, decay) {
+    const sampleRate = audioContext.sampleRate;
+    const length = sampleRate * duration;
+    const impulse = audioContext.createBuffer(2, length, sampleRate);
+    const impulseL = impulse.getChannelData(0);
+    const impulseR = impulse.getChannelData(1);
+    
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+      // Exponential decay envelope
+      const envelope = Math.exp(-t * decay);
+      // Stereo decorrelation with slightly different noise
+      impulseL[i] = (Math.random() * 2 - 1) * envelope;
+      impulseR[i] = (Math.random() * 2 - 1) * envelope;
+    }
+    
+    reverbNode.buffer = impulse;
+    reverbBuffer = impulse;
   }
 
   function connectAudioNodes() {
@@ -1875,13 +1985,26 @@ def get_audio_player_js():
     }
 
     audioSource = audioContext.createMediaElementSource(audio);
+    
+    // Audio chain: source -> EQ -> gain -> [dry path + wet path] -> analyser -> destination
+    // EQ chain
     audioSource
       .connect(bassNode)
       .connect(midNode)
       .connect(trebleNode)
-      .connect(gainNode)
-      .connect(analyserNode)
-      .connect(audioContext.destination);
+      .connect(gainNode);
+    
+    // Dry path (no reverb)
+    gainNode.connect(dryGainNode);
+    dryGainNode.connect(analyserNode);
+    
+    // Wet path (with reverb)
+    gainNode.connect(reverbNode);
+    reverbNode.connect(reverbGainNode);
+    reverbGainNode.connect(analyserNode);
+    
+    // Output
+    analyserNode.connect(audioContext.destination);
   }
   
   /**
@@ -2154,17 +2277,21 @@ def get_audio_player_js():
       bassSlider.value = 0;
       midSlider.value = 0;
       trebleSlider.value = 0;
+      reverbSlider.value = 0;
 
       currentTempo = 1.0;
       audio.playbackRate = 1;
       bassNode.gain.value = 0;
       midNode.gain.value = 0;
       trebleNode.gain.value = 0;
+      reverbGainNode.gain.value = 0;
+      dryGainNode.gain.value = 1;
 
       tempoVal.textContent = '100%';
       bassVal.textContent = '0';
       midVal.textContent = '0';
       trebleVal.textContent = '0';
+      reverbVal.textContent = '0%';
 
       // Only reset loop mode on very first initialization
       if (typeof loopMode === 'undefined') {
@@ -2273,26 +2400,80 @@ def get_audio_player_js():
     tempoVal.textContent = tempo + '%';
   }, SLIDER_DEBOUNCE);
 
-  const updateBass = debounce((gain) => {
+  const updateBass = throttle((gain) => {
     if (bassNode && bassNode.gain) {
       bassNode.gain.value = gain;
     }
     bassVal.textContent = (gain > 0 ? '+' : '') + gain;
-  }, SLIDER_DEBOUNCE);
+  }, 16);
 
-  const updateMid = debounce((gain) => {
+  const updateMid = throttle((gain) => {
     if (midNode && midNode.gain) {
       midNode.gain.value = gain;
     }
     midVal.textContent = (gain > 0 ? '+' : '') + gain;
-  }, SLIDER_DEBOUNCE);
+  }, 16);
 
-  const updateTreble = debounce((gain) => {
+  const updateTreble = throttle((gain) => {
     if (trebleNode && trebleNode.gain) {
       trebleNode.gain.value = gain;
     }
     trebleVal.textContent = (gain > 0 ? '+' : '') + gain;
-  }, SLIDER_DEBOUNCE);
+  }, 16);
+
+  const updateReverb = throttle((value) => {
+    // value is 0-100, convert to wet/dry mix
+    const wetAmount = value / 100;
+    const dryAmount = 1 - (wetAmount * 0.5);  // Keep some dry signal even at max reverb
+
+    if (reverbGainNode && reverbGainNode.gain) {
+      reverbGainNode.gain.value = wetAmount;
+    }
+    if (dryGainNode && dryGainNode.gain) {
+      dryGainNode.gain.value = dryAmount;
+    }
+    reverbVal.textContent = value + '%';
+  }, 16);
+
+  /**
+   * Reset all audio controls to their default values.
+   * Volume is preserved as it's user preference.
+   */
+  function resetControls() {
+    // Reset slider values
+    tempoSlider.value = 100;
+    bassSlider.value = 0;
+    midSlider.value = 0;
+    trebleSlider.value = 0;
+    reverbSlider.value = 0;
+
+    // Reset audio parameters
+    currentTempo = 1.0;
+    audio.playbackRate = 1;
+
+    if (bassNode && bassNode.gain) {
+      bassNode.gain.value = 0;
+    }
+    if (midNode && midNode.gain) {
+      midNode.gain.value = 0;
+    }
+    if (trebleNode && trebleNode.gain) {
+      trebleNode.gain.value = 0;
+    }
+    if (reverbGainNode && reverbGainNode.gain) {
+      reverbGainNode.gain.value = 0;
+    }
+    if (dryGainNode && dryGainNode.gain) {
+      dryGainNode.gain.value = 1;
+    }
+
+    // Update display values
+    tempoVal.textContent = '100%';
+    bassVal.textContent = '0';
+    midVal.textContent = '0';
+    trebleVal.textContent = '0';
+    reverbVal.textContent = '0%';
+  }
 
   // ========================================
   // PLAYLIST LOADING
@@ -2323,7 +2504,7 @@ def get_audio_player_js():
       links.forEach(link => {
         const href = link.getAttribute('href');
         const text = link.textContent.trim();
-        
+
         if (href && isAudioFile(text)) {
           const fullUrl = new URL(href, currentFileUrl).href;
           currentPlaylist.push({ url: fullUrl, name: text });
@@ -2396,6 +2577,10 @@ def get_audio_player_js():
   bassSlider.addEventListener('input', (e) => updateBass(e.target.value));
   midSlider.addEventListener('input', (e) => updateMid(e.target.value));
   trebleSlider.addEventListener('input', (e) => updateTreble(e.target.value));
+  reverbSlider.addEventListener('input', (e) => updateReverb(e.target.value));
+
+  // Reset button
+  resetBtn.addEventListener('click', resetControls);
 
   // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
