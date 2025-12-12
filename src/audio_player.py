@@ -582,7 +582,7 @@ def get_audio_player_html():
         </svg>
       </button>
       
-      <button id="audio-loop" class="audio-btn" data-mode="0" aria-label="Loop off">
+      <button id="audio-loop" class="audio-btn" data-mode="0" aria-label="Repeat off">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 1l4 4-4 4"/>
           <path d="M3 11V9a4 4 0 014-4h14"/>
@@ -1791,17 +1791,17 @@ def get_audio_player_js():
   let reverbGainNode = null;  // Wet signal gain
   let dryGainNode = null;     // Dry signal gain
   let reverbBuffer = null;    // Impulse response buffer
-  
+
   // Tempo control
   let currentTempo = 1.0;     // playback rate (1.0 = normal)
 
   const freqData = new Uint8Array(FFT_SIZE / 2);
   const vuPeaks = new Float32Array(VU_BARS);  // Peak hold values
   const vuPeakTimers = new Array(VU_BARS).fill(0);  // Peak decay timers
-  
+
   let currentPlaylist = [];
   let currentTrackIndex = 0;
-  let loopMode = 0;  // 0=off, 1=all, 2=one
+  let loopMode = 0;  // 0=off, 1=repeat current track
   let visualizerActive = true;
   let animationFrameId = null;
   let abortController = null;
@@ -1813,7 +1813,7 @@ def get_audio_player_js():
 
   // Persistent audio element
   const audio = document.getElementById('audio-element');
-  
+
   // Full modal elements
   const modal = document.getElementById('audio-modal');
   const albumArt = document.getElementById('album-art');
@@ -1905,10 +1905,10 @@ def get_audio_player_js():
 
   /**
    * Normalize loop mode to prevent stuck states.
-   * Ensures loopMode is always one of {0, 1, 2}.
+   * Ensures loopMode is always one of {0, 1}.
    */
   function normalizeLoopMode() {
-    if (typeof loopMode !== 'number' || loopMode < 0 || loopMode > 2) {
+    if (typeof loopMode !== 'number' || loopMode < 0 || loopMode > 1) {
       loopMode = 0;
     }
     return loopMode;
@@ -1938,23 +1938,23 @@ def get_audio_player_js():
     midNode.Q.value = 1;
     trebleNode.type = 'highshelf';
     trebleNode.frequency.value = 3000;
-    
+
     // Initialize reverb nodes
     reverbNode = audioContext.createConvolver();
     reverbGainNode = audioContext.createGain();
     dryGainNode = audioContext.createGain();
-    
+
     // Start with no reverb (dry = 1, wet = 0)
     reverbGainNode.gain.value = 0;
     dryGainNode.gain.value = 1;
-    
+
     // Generate synthetic impulse response for reverb (2 second hall reverb)
     createReverbImpulse(2.0, 2.5);
-    
+
     // Initialize tempo state
     currentTempo = 1.0;
   }
-  
+
   /**
    * Create a synthetic impulse response for reverb effect.
    * Uses exponential decay with noise to simulate a reverb tail.
@@ -1965,7 +1965,7 @@ def get_audio_player_js():
     const impulse = audioContext.createBuffer(2, length, sampleRate);
     const impulseL = impulse.getChannelData(0);
     const impulseR = impulse.getChannelData(1);
-    
+
     for (let i = 0; i < length; i++) {
       const t = i / sampleRate;
       // Exponential decay envelope
@@ -1974,7 +1974,7 @@ def get_audio_player_js():
       impulseL[i] = (Math.random() * 2 - 1) * envelope;
       impulseR[i] = (Math.random() * 2 - 1) * envelope;
     }
-    
+
     reverbNode.buffer = impulse;
     reverbBuffer = impulse;
   }
@@ -1985,7 +1985,7 @@ def get_audio_player_js():
     }
 
     audioSource = audioContext.createMediaElementSource(audio);
-    
+
     // Audio chain: source -> EQ -> gain -> [dry path + wet path] -> analyser -> destination
     // EQ chain
     audioSource
@@ -1993,20 +1993,20 @@ def get_audio_player_js():
       .connect(midNode)
       .connect(trebleNode)
       .connect(gainNode);
-    
+
     // Dry path (no reverb)
     gainNode.connect(dryGainNode);
     dryGainNode.connect(analyserNode);
-    
+
     // Wet path (with reverb)
     gainNode.connect(reverbNode);
     reverbNode.connect(reverbGainNode);
     reverbGainNode.connect(analyserNode);
-    
+
     // Output
     analyserNode.connect(audioContext.destination);
   }
-  
+
   /**
    * Calculate playback rate for pitch and tempo control.
    * Since we can't truly separate pitch from tempo with basic playbackRate,
@@ -2197,8 +2197,8 @@ def get_audio_player_js():
   function playNext() {
     normalizeLoopMode();
     
-    // Repeat one: restart current track
-    if (loopMode === 2) {
+    // Repeat current track: restart current track
+    if (loopMode === 1) {
       audio.currentTime = 0;
       audio.play().catch(err => console.error('Playback failed:', err));
       return;
@@ -2209,16 +2209,11 @@ def get_audio_player_js():
     
     // Handle end of playlist
     if (nextIndex >= currentPlaylist.length) {
-      if (loopMode === 1) {
-        // Repeat all: wrap to first track
-        nextIndex = 0;
-      } else {
-        // Loop off: stop playback
-        audio.pause();
-        updatePlayPauseIcons(true);
-        stopVUMeter();
-        return;
-      }
+      // Loop off: stop playback
+      audio.pause();
+      updatePlayPauseIcons(true);
+      stopVUMeter();
+      return;
     }
     
     playTrack(nextIndex);
@@ -2227,21 +2222,21 @@ def get_audio_player_js():
   function playPrev() {
     let prevIndex = currentTrackIndex - 1;
     if (prevIndex < 0) {
-      prevIndex = loopMode === 1 ? currentPlaylist.length - 1 : 0;
+      prevIndex = 0;
     }
     playTrack(prevIndex);
   }
 
   function toggleLoop() {
-    // Cycle through modes: 0 -> 1 -> 2 -> 0
-    loopMode = (loopMode + 1) % 3;
+    // Toggle between 0 (off) and 1 (repeat current track)
+    loopMode = loopMode === 0 ? 1 : 0;
     normalizeLoopMode();
     
     // Update visual state
     loopBtn.setAttribute('data-mode', String(loopMode));
     
     // Update accessibility label
-    const labels = ['Loop off', 'Loop all', 'Loop one'];
+    const labels = ['Repeat off', 'Repeat'];
     loopBtn.setAttribute('aria-label', labels[loopMode]);
   }
 
