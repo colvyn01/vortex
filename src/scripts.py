@@ -694,28 +694,43 @@ document.addEventListener('DOMContentLoaded', function() {
 	function loadActiveDevices() {
 		if (!isHost) return;
 
-		fetch('/api/active-devices?session=' + encodeURIComponent(sessionId), {
-			headers: {
-				'X-Device-ID': DEVICE_ID,
-				'X-Device-Name': SENDER_NAME
-			}
-		})
-			.then(function(response) {
+		// Fetch both active devices and banned devices
+		Promise.all([
+			fetch('/api/active-devices?session=' + encodeURIComponent(sessionId), {
+				headers: {
+					'X-Device-ID': DEVICE_ID,
+					'X-Device-Name': SENDER_NAME
+				}
+			}).then(function(response) {
 				if (!response.ok) throw new Error('Failed to load active devices');
 				return response.json();
+			}),
+			fetch('/api/banned-devices', {
+				headers: {
+					'X-Device-ID': DEVICE_ID,
+					'X-Device-Name': SENDER_NAME
+				}
+			}).then(function(response) {
+				if (!response.ok) throw new Error('Failed to load banned devices');
+				return response.json();
 			})
-			.then(function(data) {
+		])
+			.then(function(results) {
+				var activeData = results[0];
+				var bannedData = results[1];
+				var bannedSet = new Set(bannedData.banned_devices || []);
+
 				var activeList = document.getElementById('active-list');
 				if (!activeList) return;
 
 				activeList.innerHTML = '';
 
-				if (data.active_devices.length === 0) {
+				if (activeData.active_devices.length === 0) {
 					activeList.innerHTML = '<div class="active-empty">No active devices</div>';
 					return;
 				}
 
-				data.active_devices.forEach(function(device) {
+				activeData.active_devices.forEach(function(device) {
 					var item = document.createElement('div');
 					item.className = 'active-item';
 
@@ -727,14 +742,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
 					// Don't allow host to kick itself
 					if (device.device_id !== DEVICE_ID) {
-						var kickBtn = document.createElement('button');
-						kickBtn.className = 'kick-button-inline';
-						kickBtn.textContent = 'Kick';
-						kickBtn.onclick = function() {
-							kickDevice(device.device_id, device.device_name);
-							setTimeout(loadActiveDevices, 500);
-						};
-						item.appendChild(kickBtn);
+						var isBanned = bannedSet.has(device.device_id);
+						var actionBtn = document.createElement('button');
+
+						if (isBanned) {
+							actionBtn.className = 'unkick-button';
+							actionBtn.textContent = 'Unkick';
+							actionBtn.onclick = function() {
+								unkickDevice(device.device_id);
+								setTimeout(loadActiveDevices, 500);
+							};
+						} else {
+							actionBtn.className = 'kick-button-inline';
+							actionBtn.textContent = 'Kick';
+							actionBtn.onclick = function() {
+								kickDevice(device.device_id, device.device_name);
+								setTimeout(loadActiveDevices, 500);
+							};
+						}
+						item.appendChild(actionBtn);
 					}
 
 					activeList.appendChild(item);
@@ -889,6 +915,14 @@ document.addEventListener('DOMContentLoaded', function() {
 					if (eventSource) {
 						eventSource.close();
 						eventSource = null;
+					}
+					return;
+				}
+
+				// Handle device kicked event - terminate immediately if this device was kicked
+				if (message.type === 'device_kicked') {
+					if (message.device_id === DEVICE_ID) {
+						handleKicked();
 					}
 					return;
 				}

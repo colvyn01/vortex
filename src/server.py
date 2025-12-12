@@ -1076,6 +1076,20 @@ class VortexHandler(SimpleHTTPRequestHandler):
         _banned_devices.add(device_id)
         _save_banned_devices()
 
+        # Broadcast kick event to all SSE clients so kicked device terminates immediately
+        kick_message = {
+            "type": "device_kicked",
+            "device_id": device_id,
+            "timestamp": time.time(),
+        }
+        with _sse_lock:
+            for session_id in _sse_queues:
+                for client_queue in _sse_queues[session_id]:
+                    try:
+                        client_queue.put_nowait(kick_message)
+                    except queue.Full:
+                        pass
+
         self._send_json({"status": "ok", "message": "Device banned successfully"})
 
     def _handle_api_unkick_post(self) -> None:
