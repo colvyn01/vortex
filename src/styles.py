@@ -26,14 +26,14 @@ CSS_STYLESHEET = """
   --text-secondary: #546E7A;
   --text-inverse: #FFFFFF;
 
-  --accent-color: #00897B;
-  --accent-hover: #00695C;
+  --accent-color: #3949AB;
+  --accent-hover: #283593;
   --secondary-accent: #E64A19;
   --error-color: #C62828;
-  --success-color: #388E3C;
+  --success-color: #43A047;
   --offline-color: #D32F2F;
 
-  --accent-rgb: 0,137,123;
+  --accent-rgb: 57,73,171;
   --secondary-accent-rgb: 230,74,25;
   --error-rgb: 198,40,40;
 
@@ -46,6 +46,7 @@ CSS_STYLESHEET = """
 
   /* transition for theme switch */
   --theme-transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+  --grid-color: rgba(0, 0, 0, 0.04);
 }
 
 /* Dark Mode Overrides */
@@ -62,8 +63,8 @@ CSS_STYLESHEET = """
   --text-secondary: #B0BEC5;
   --text-inverse: #FFFFFF;
 
-  --accent-color: #26A69A;
-  --accent-hover: #00897B;
+  --accent-color: #7986CB;
+  --accent-hover: #5C6BC0;
   --secondary-accent: #FF5722;
   --success-color: #81C784;
   --offline-color: #E57373;
@@ -71,6 +72,7 @@ CSS_STYLESHEET = """
   --border-color: #333333;
   --border-light: #424242;
   --border-dashed: #555555;
+  --grid-color: rgba(255, 255, 255, 0.05);
 }
 
 body {
@@ -101,8 +103,8 @@ html {
 body {
   background-color: var(--bg-color);
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    linear-gradient(var(--grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
   background-size: 20px 20px;
   color: var(--text-main);
   font-family: var(--font-ui);
@@ -264,8 +266,8 @@ body {
 .device-main {
   padding: 0.8rem 1rem 0.8rem;
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  grid-template-areas: "files upload chat";
+  grid-template-columns: 1fr 2fr 1fr;
+  grid-template-areas: "upload files chat";
   column-gap: 1rem;
   row-gap: 0.75rem;
   min-height: 0;
@@ -289,7 +291,7 @@ body {
 /* medium screens */
 @media (max-width: 1200px) and (min-width: 901px) {
   .device-main {
-    grid-template-columns: 1.5fr 1fr 1fr;
+    grid-template-columns: 1fr 1.5fr 1fr;
   }
 }
 

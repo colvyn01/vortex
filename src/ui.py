@@ -256,15 +256,6 @@ def render_directory_listing(
     # Main content with upload panel, file list, and chat
     main_content = f"""
     <main class="device-main">
-      <section class="panel panel-files">
-        <div class="panel-title">
-          <span>Files</span>
-        </div>
-        {download_btn}
-        <div class="file-list">
-          {table_html}
-        </div>
-      </section>
       <section class="panel panel-upload">
         <div class="panel-title">
           <span>Upload</span>
@@ -291,6 +282,15 @@ def render_directory_listing(
           <div class="qr-title">Scan to Connect</div>
           <div id="qr-code"></div>
           <div class="qr-url" id="qr-url-text"></div>
+        </div>
+      </section>
+      <section class="panel panel-files">
+        <div class="panel-title">
+          <span>Files</span>
+        </div>
+        {download_btn}
+        <div class="file-list">
+          {table_html}
         </div>
       </section>
       <section class="panel panel-chat">
