@@ -32,8 +32,8 @@ DNS_SERVERS = [
 # Streaming Configuration
 
 # Chunk size for streaming file reads/writes.
-# 1MB optimized for modern networks to reduce I/O syscall overhead.
-CHUNK_SIZE = 256 * 1024  # Optimized for concurrency
+# 512KB optimized for throughput on modern networks and SSDs.
+CHUNK_SIZE = 512 * 1024  # 512KB for maximum throughput
 
 # Maximum size for multipart form headers before rejecting request.
 # Prevents memory exhaustion from malformed or malicious requests.

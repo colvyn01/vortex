@@ -31,8 +31,8 @@ class UploadResult:
     Result of a file upload operation.
 
     Attributes:
-        success: True if the upload completed successfully.
-        error_message: Description of the error if success is False.
+            success: True if the upload completed successfully.
+            error_message: Description of the error if success is False.
     """
 
     success: bool
@@ -50,10 +50,10 @@ def extract_boundary(content_type: str) -> Optional[str]:
     form submission.
 
     Args:
-        content_type: The Content-Type header value.
+            content_type: The Content-Type header value.
 
     Returns:
-        The boundary string, or None if not found.
+            The boundary string, or None if not found.
     """
     match = re.search(r"boundary=(.+)", content_type)
     if not match:
@@ -90,15 +90,15 @@ def parse_multipart_streaming(
     4. Moving the temp file to the final destination on success
 
     Args:
-        rfile: The request input stream (socket file object).
-        content_length: Total bytes to read from the stream.
-        boundary: The multipart boundary string.
-        base_directory: Directory where uploaded files will be saved.
-        upload_id: Optional unique identifier for tracking this upload.
-        termination_check: Optional callable that returns True if upload should abort.
+            rfile: The request input stream (socket file object).
+            content_length: Total bytes to read from the stream.
+            boundary: The multipart boundary string.
+            base_directory: Directory where uploaded files will be saved.
+            upload_id: Optional unique identifier for tracking this upload.
+            termination_check: Optional callable that returns True if upload should abort.
 
     Returns:
-        UploadResult indicating success or failure with error message.
+            UploadResult indicating success or failure with error message.
     """
     boundary_bytes = ("--" + boundary).encode(ENCODING)
 
@@ -218,6 +218,13 @@ def parse_multipart_streaming(
 
         with os.fdopen(temp_fd, "wb") as temp_file:
             temp_fd = None  # fdopen takes ownership of the file descriptor
+
+            # Hint to OS for sequential write optimization (Linux only)
+            try:
+                if hasattr(os, "posix_fadvise"):
+                    os.posix_fadvise(temp_file.fileno(), 0, 0, os.POSIX_FADV_SEQUENTIAL)
+            except (AttributeError, OSError):
+                pass  # Not available on Windows/macOS
 
             # Check if the entire file was in the initial buffer
             boundary_pos = file_data_start.find(boundary_bytes)
