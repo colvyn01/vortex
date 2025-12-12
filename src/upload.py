@@ -33,10 +33,12 @@ class UploadResult:
     Attributes:
             success: True if the upload completed successfully.
             error_message: Description of the error if success is False.
+            filename: Name of the uploaded file (available on success).
     """
 
     success: bool
     error_message: Optional[str] = None
+    filename: Optional[str] = None
 
 
 # Multipart Parsing
@@ -75,6 +77,7 @@ def parse_multipart_streaming(
     base_directory: str,
     upload_id: Optional[str] = None,
     termination_check: Optional[callable] = None,
+    progress_callback: Optional[callable] = None,
 ) -> UploadResult:
     """
     Parse multipart form data using streaming to handle large files.
@@ -96,6 +99,7 @@ def parse_multipart_streaming(
             base_directory: Directory where uploaded files will be saved.
             upload_id: Optional unique identifier for tracking this upload.
             termination_check: Optional callable that returns True if upload should abort.
+            progress_callback: Optional callable(bytes_uploaded, total_bytes, filename) for progress updates.
 
     Returns:
             UploadResult indicating success or failure with error message.
@@ -226,6 +230,11 @@ def parse_multipart_streaming(
             except (AttributeError, OSError):
                 pass  # Not available on Windows/macOS
 
+            # Track bytes written for progress reporting
+            bytes_written = 0
+            last_progress_report = 0
+            progress_interval = 100 * 1024  # Report every 100KB
+
             # Check if the entire file was in the initial buffer
             boundary_pos = file_data_start.find(boundary_bytes)
             if boundary_pos != -1:
@@ -234,6 +243,13 @@ def parse_multipart_streaming(
                 if file_data.endswith(b"\r\n"):
                     file_data = file_data[:-2]
                 temp_file.write(file_data)
+                bytes_written = len(file_data)
+                # Report final progress for small files
+                if progress_callback:
+                    try:
+                        progress_callback(bytes_written, content_length, filename)
+                    except Exception:
+                        pass  # Don't let callback errors affect upload
             else:
                 # Large file: need to stream the rest
                 # Use optimized buffer for boundary detection
@@ -261,6 +277,18 @@ def parse_multipart_streaming(
                     if not chunk:
                         break
                     remaining -= len(chunk)
+                    bytes_written += len(chunk)
+
+                    # Report progress at intervals
+                    if (
+                        progress_callback
+                        and bytes_written - last_progress_report >= progress_interval
+                    ):
+                        try:
+                            progress_callback(bytes_written, content_length, filename)
+                            last_progress_report = bytes_written
+                        except Exception:
+                            pass  # Don't let callback errors affect upload
 
                     # Append to buffer and check for boundary
                     buffer += chunk
@@ -294,7 +322,14 @@ def parse_multipart_streaming(
         os.rename(temp_path, dest_path)
         temp_path = None  # Successfully moved
 
-        return UploadResult(success=True)
+        # Report final progress
+        if progress_callback:
+            try:
+                progress_callback(content_length, content_length, filename)
+            except Exception:
+                pass
+
+        return UploadResult(success=True, filename=filename)
 
     except OSError as e:
         return UploadResult(success=False, error_message=f"Failed to save file: {e}")

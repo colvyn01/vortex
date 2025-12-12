@@ -881,6 +881,22 @@ document.addEventListener('DOMContentLoaded', function() {
 					return;
 				}
 				
+				// Handle upload progress updates (visible to host)
+				if (message.type === 'upload_progress') {
+					if (isHost) {
+						showUploadProgress(message);
+					}
+					return;
+				}
+				
+				// Handle upload completion (visible to host)
+				if (message.type === 'upload_complete') {
+					if (isHost) {
+						handleUploadComplete(message);
+					}
+					return;
+				}
+				
 				renderMessage(message);
 				
 				// Update connection status
@@ -945,6 +961,179 @@ document.addEventListener('DOMContentLoaded', function() {
 		setTimeout(function() {
 			alert('You have been removed from this server by the host.');
 		}, 500);
+	}
+
+	/**
+	 * Show upload progress toast notification (host only).
+	 * Creates or updates a toast showing remote device upload progress.
+	 */
+	function showUploadProgress(message) {
+		var toast = document.getElementById('upload-progress-toast');
+		
+		// Create toast if it doesn't exist
+		if (!toast) {
+			toast = document.createElement('div');
+			toast.id = 'upload-progress-toast';
+			toast.className = 'upload-toast';
+			toast.innerHTML = `
+				<div class="upload-toast-header">
+					<span class="upload-toast-device"></span>
+					<span class="upload-toast-close" onclick="this.parentElement.parentElement.classList.remove('active')">&times;</span>
+				</div>
+				<div class="upload-toast-filename"></div>
+				<div class="upload-toast-progress">
+					<div class="upload-toast-bar"></div>
+				</div>
+				<div class="upload-toast-text"></div>
+			`;
+			document.body.appendChild(toast);
+		}
+		
+		// Update toast content
+		var deviceSpan = toast.querySelector('.upload-toast-device');
+		var filenameDiv = toast.querySelector('.upload-toast-filename');
+		var progressBar = toast.querySelector('.upload-toast-bar');
+		var progressText = toast.querySelector('.upload-toast-text');
+		
+		if (deviceSpan) deviceSpan.textContent = message.device_name + ' uploading';
+		if (filenameDiv) filenameDiv.textContent = message.filename;
+		if (progressBar) progressBar.style.width = message.percent + '%';
+		if (progressText) {
+			progressText.textContent = formatSize(message.bytes_uploaded) + ' / ' + formatSize(message.total_bytes) + ' (' + message.percent + '%)';
+		}
+		
+		// Show the toast
+		toast.classList.add('active');
+	}
+
+	/**
+	 * Handle upload completion event (host only).
+	 * Refreshes file list and navigates to upload directory if different.
+	 */
+	function handleUploadComplete(message) {
+		var toast = document.getElementById('upload-progress-toast');
+		
+		// Update toast to show completion briefly
+		if (toast) {
+			var progressBar = toast.querySelector('.upload-toast-bar');
+			var progressText = toast.querySelector('.upload-toast-text');
+			if (progressBar) progressBar.style.width = '100%';
+			if (progressText) progressText.textContent = 'Upload complete!';
+			
+			// Hide toast after 2 seconds
+			setTimeout(function() {
+				toast.classList.remove('active');
+			}, 2000);
+		}
+		
+		// Check if we're in the upload directory
+		var currentPath = window.location.pathname;
+		var uploadPath = message.upload_path;
+		
+		if (currentPath === uploadPath || currentPath === uploadPath + '/') {
+			// Same directory - just refresh file list
+			refreshFileListGlobal();
+		} else {
+			// Different directory - navigate to upload directory
+			navigateToUploadDirectory(uploadPath);
+		}
+	}
+
+	/**
+	 * Refresh file list without page reload (global version for SSE handlers).
+	 */
+	function refreshFileListGlobal() {
+		var fileList = document.querySelector('.file-list');
+		if (!fileList) {
+			window.location.reload();
+			return;
+		}
+
+		fileList.classList.add('updating');
+
+		fetch(window.location.pathname, {
+			headers: {
+				'X-Requested-With': 'XMLHttpRequest'
+			}
+		})
+			.then(function(response) {
+				if (!response.ok) throw new Error('Refresh failed');
+				return response.text();
+			})
+			.then(function(html) {
+				var parser = new DOMParser();
+				var doc = parser.parseFromString(html, 'text/html');
+
+				var newFileList = doc.querySelector('.file-list');
+				var currentFileList = document.querySelector('.file-list');
+				if (newFileList && currentFileList) {
+					currentFileList.innerHTML = newFileList.innerHTML;
+					currentFileList.classList.remove('updating');
+				}
+
+				// Refresh directory size
+				if (typeof fetchDirectorySize === 'function') {
+					fetchDirectorySize();
+				}
+			})
+			.catch(function(error) {
+				console.error('File list refresh failed:', error);
+				fileList.classList.remove('updating');
+			});
+	}
+
+	/**
+	 * Navigate to upload directory and refresh file list.
+	 */
+	function navigateToUploadDirectory(path) {
+		// Update browser URL without full reload
+		window.history.pushState({}, '', path);
+
+		var fileList = document.querySelector('.file-list');
+		if (!fileList) {
+			window.location.href = path;
+			return;
+		}
+
+		fileList.classList.add('updating');
+
+		fetch(path, {
+			headers: {
+				'X-Requested-With': 'XMLHttpRequest'
+			}
+		})
+			.then(function(response) {
+				if (!response.ok) throw new Error('Navigation failed');
+				return response.text();
+			})
+			.then(function(html) {
+				var parser = new DOMParser();
+				var doc = parser.parseFromString(html, 'text/html');
+
+				// Update file listing
+				var newFileList = doc.querySelector('.file-list');
+				var currentFileList = document.querySelector('.file-list');
+				if (newFileList && currentFileList) {
+					currentFileList.innerHTML = newFileList.innerHTML;
+					currentFileList.classList.remove('updating');
+				}
+
+				// Update path display
+				var newSubheader = doc.querySelector('.device-subheader');
+				var currentSubheader = document.querySelector('.device-subheader');
+				if (newSubheader && currentSubheader) {
+					currentSubheader.innerHTML = newSubheader.innerHTML;
+				}
+
+				// Refresh directory size
+				if (typeof fetchDirectorySize === 'function') {
+					fetchDirectorySize();
+				}
+			})
+			.catch(function(error) {
+				console.error('Navigation failed:', error);
+				window.location.href = path;
+			});
 	}
 
 	/**

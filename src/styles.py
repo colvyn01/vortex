@@ -1325,6 +1325,101 @@ a:active {
 }
 
 
+/* Upload Progress Toast (Host View) */
+
+.upload-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 280px;
+  background: var(--surface-color);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: 10px;
+  padding: 0.75rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  font-family: var(--font-ui);
+  opacity: 0;
+  transform: translateX(100%);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  pointer-events: none;
+}
+
+.upload-toast.active {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.upload-toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.upload-toast-device {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-color);
+}
+
+.upload-toast-close {
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-dim);
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.upload-toast-close:hover {
+  color: var(--error-color);
+}
+
+.upload-toast-filename {
+  font-size: 0.75rem;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 0.5rem;
+}
+
+.upload-toast-progress {
+  width: 100%;
+  height: 8px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+
+.upload-toast-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent-color), var(--accent-hover));
+  border-radius: 6px;
+  transition: width 0.15s ease;
+}
+
+.upload-toast-text {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+@media (max-width: 600px) {
+  .upload-toast {
+    bottom: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+  }
+}
+
+
 /* Universal Button State Rules - Hardware Aesthetic */
 /* Default and active states have no shadow, hover has subtle depth */
 
