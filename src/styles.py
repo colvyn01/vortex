@@ -47,6 +47,11 @@ CSS_STYLESHEET = """
   /* transition for theme switch */
   --theme-transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
   --grid-color: rgba(0, 0, 0, 0.04);
+
+  /* Glassmorphism Variables */
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --player-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
 }
 
 /* Dark Mode Overrides */
@@ -73,6 +78,11 @@ CSS_STYLESHEET = """
   --border-light: #424242;
   --border-dashed: #555555;
   --grid-color: rgba(255, 255, 255, 0.05);
+
+  /* Dark Mode Glassmorphism */
+  --glass-bg: rgba(20, 20, 20, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --player-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
 }
 
 body {
@@ -150,7 +160,14 @@ body {
   .device-shell {
     max-height: calc(100vh - 3rem);
   }
+
+  /* Increase bottom padding of scrollable areas when miniplayer is active to prevent overlap */
+  body.mini-player-active .file-list,
+  body.mini-player-active .chat-messages {
+    padding-bottom: 100px; /* Space for floating miniplayer */
+  }
 }
+
 
 /* mobile layout */
 @media (max-width: 600px) {

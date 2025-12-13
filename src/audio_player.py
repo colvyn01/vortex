@@ -487,6 +487,11 @@ def get_audio_player_html():
         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
       </svg>
     </a>
+    <button id="mini-minimize" class="mini-btn" aria-label="Minimize player">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6"/>
+      </svg>
+    </button>
     <button id="mini-expand" class="mini-btn" aria-label="Expand player">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M7 13L12 8L17 13M7 17L12 12L17 17"/>
@@ -498,6 +503,13 @@ def get_audio_player_html():
       </svg>
     </button>
   </div>
+</div>
+
+<!-- Minimized Restore Button (Arrow at bottom) -->
+<div id="mini-restore-btn" class="mini-restore-btn" style="display: none;">
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M18 15l-6-6-6 6"/>
+  </svg>
 </div>
 
 <!-- Full Audio Player Modal -->
@@ -655,18 +667,17 @@ def get_audio_player_html():
 
 <!-- Global style for container padding when mini-player active -->
 <style id="mini-player-styles">
-  /* Add padding to body to prevent content clipping behind viewport-attached mini-player */
-  body.mini-player-active {
-    padding-bottom: 56px !important;
-    transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  
-  /* Mobile: Account for safe-area-inset */
+  /* Mobile: Add padding to body to prevent content clipping */
   @media (max-width: 899px) {
     body.mini-player-active {
-      padding-bottom: calc(56px + env(safe-area-inset-bottom)) !important;
+      padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
       transition: padding-bottom 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
+  }
+
+  /* Desktop: Pure overlay mode - no layout shift */
+  @media (min-width: 900px) {
+    /* No changes to body or shell - player floats independently */
   }
 </style>
 """
@@ -1416,31 +1427,46 @@ html {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 56px;
-  /* Glassmorphism effect - theme colors only, no saturation boost */
-  background: rgba(232, 244, 241, 0.85); /* Cool off-white/teal tint */
-  backdrop-filter: blur(12px); /* Remove saturate() to fix blue shift */
-  -webkit-backdrop-filter: blur(12px); /* Safari support */
-  border: none;
-  border-top: 1px solid rgba(0, 121, 107, 0.3); /* Slightly stronger top border */
-  border-radius: 0;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.12); /* Pure black shadow only */
+  height: 64px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-top: 1px solid var(--glass-border);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 0.375rem 1rem;
-  padding-bottom: calc(0.375rem + env(safe-area-inset-bottom));
-  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: opacity;
+  gap: 1rem;
+  padding: 0 1rem;
+  padding-bottom: env(safe-area-inset-bottom);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  will-change: transform, opacity;
   contain: layout;
+  box-shadow: 0 -1px 0 var(--glass-border);
+}
+
+/* Desktop Floating Island Mode */
+@media (min-width: 900px) {
+  .mini-player {
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 24px;
+    right: auto;
+    width: auto;
+    min-width: 420px;
+    max-width: 600px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    padding-bottom: 0;
+    box-shadow: var(--player-shadow);
+  }
 }
 
 /* Fallback for browsers without backdrop-filter support */
 @supports not (backdrop-filter: blur(10px)) {
   .mini-player {
-    background: rgba(255, 251, 247, 0.96); /* More opaque fallback */
+    background: var(--surface-color);
+    opacity: 0.98;
   }
 }
 
@@ -1596,6 +1622,69 @@ html {
 
 .mini-volume-slider:focus-visible {
   outline: none; /* No outline on track, thumb provides visual feedback */
+}
+
+/* ========================================
+   MINIMIZE / RESTORE UI
+   ======================================== */
+
+.mini-restore-btn {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 24px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  border-bottom: none;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 10000;
+  color: var(--text-main);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s cubic-bezier(0.25, 0.8, 0.25, 1);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(100%);
+}
+
+.mini-restore-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.mini-restore-btn:hover {
+  height: 32px;
+  background: var(--accent-color);
+  color: white;
+  border-color: var(--accent-hover);
+}
+
+/* Minimized state for the player */
+.mini-player.minimized {
+  /* Move completely off-screen but keep in DOM */
+  transform: translateY(200%) !important; 
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Hide body padding when minimized to reclaim space */
+body.mini-player-active.player-minimized {
+  padding-bottom: env(safe-area-inset-bottom) !important;
+}
+
+/* Mobile override for transform logic if needed */
+@media (max-width: 899px) {
+  .mini-player.minimized {
+    transform: translateY(150%) !important;
+  }
 }
 
 .mini-volume-slider:focus-visible::-webkit-slider-thumb {
@@ -1858,8 +1947,10 @@ def get_audio_player_js():
   const miniPrevBtn = document.getElementById('mini-prev');
   const miniNextBtn = document.getElementById('mini-next');
   const miniVolume = document.getElementById('mini-volume');
+  const miniMinimizeBtn = document.getElementById('mini-minimize');
   const miniExpandBtn = document.getElementById('mini-expand');
   const miniCloseBtn = document.getElementById('mini-close');
+  const miniRestoreBtn = document.getElementById('mini-restore-btn');
 
   // Download buttons
   const miniDownloadBtn = document.getElementById('mini-download');
@@ -2533,6 +2624,27 @@ def get_audio_player_js():
   // EVENT LISTENERS
   // ========================================
 
+  function toggleMiniMinimize() {
+    const isMinimized = miniPlayer.classList.contains('minimized');
+    
+    if (isMinimized) {
+      // Restore
+      miniPlayer.classList.remove('minimized');
+      miniRestoreBtn.classList.remove('visible');
+      miniRestoreBtn.style.display = 'none'; // fully hide
+      document.body.classList.remove('player-minimized');
+    } else {
+      // Minimize
+      miniPlayer.classList.add('minimized');
+      miniRestoreBtn.style.display = 'flex';
+      // Small delay to allow display:flex to apply before transition
+      requestAnimationFrame(() => {
+        miniRestoreBtn.classList.add('visible');
+      });
+      document.body.classList.add('player-minimized');
+    }
+  }
+
   // Full modal controls
   if (minimizeBtn) {
     minimizeBtn.addEventListener('click', minimizePlayer);
@@ -2551,6 +2663,13 @@ def get_audio_player_js():
   miniNextBtn.addEventListener('click', playNext);
   miniExpandBtn.addEventListener('click', expandPlayer);
   miniCloseBtn.addEventListener('click', dismissPlayer);
+
+  if (miniMinimizeBtn) {
+    miniMinimizeBtn.addEventListener('click', toggleMiniMinimize);
+  }
+  if (miniRestoreBtn) {
+    miniRestoreBtn.addEventListener('click', toggleMiniMinimize);
+  }
 
   // Audio events
   audio.addEventListener('timeupdate', updateProgress);
