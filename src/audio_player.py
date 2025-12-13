@@ -75,7 +75,7 @@ def generate_placeholder_svg(filename: str) -> str:
     </linearGradient>
   </defs>
   <rect width="300" height="300" fill="url(#grad)"/>
-  <path d="M150 80 L150 200 M150 200 Q165 210 165 220 Q165 230 150 230 Q135 230 135 220 Q135 210 150 200 M190 70 L190 180 M190 180 Q205 190 205 200 Q205 210 190 210 Q175 210 175 200 Q175 190 190 180 M150 80 L190 70" 
+  <path d="M150 80 L150 200 M150 200 Q165 210 165 220 Q165 230 150 230 Q135 230 135 220 Q135 210 150 200 M190 70 L190 180 M190 180 Q205 190 205 200 Q205 210 190 210 Q175 210 175 200 Q175 190 190 180 M150 80 L190 70"
         fill="rgba(255,255,255,0.9)" stroke="rgba(255,255,255,0.9)" stroke-width="3"/>
 </svg>"""
 
@@ -578,7 +578,7 @@ def get_audio_player_html():
           <path d="M6 6h2v12H6V6zm3.5 6l8.5 6V6l-8.5 6z"/>
         </svg>
       </button>
-      
+
       <button id="audio-play" class="audio-play-btn" aria-label="Play">
         <svg id="play-icon" width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8 5v14l11-7z"/>
@@ -587,13 +587,13 @@ def get_audio_player_html():
           <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
         </svg>
       </button>
-      
+
       <button id="audio-next" class="audio-btn" aria-label="Next track">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
           <path d="M16 18h2V6h-2v12zM6 18l8.5-6L6 6v12z"/>
         </svg>
       </button>
-      
+
       <button id="audio-loop" class="audio-btn" data-mode="0" aria-label="Repeat off">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 1l4 4-4 4"/>
@@ -734,6 +734,7 @@ html {
 }
 
 .audio-player-container {
+  position: relative;
   max-width: 900px;
   margin: 2rem auto;
   padding: 2rem;
@@ -741,7 +742,7 @@ html {
   /* Hardware cassette deck beveled border effect */
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  box-shadow: 
+  box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.4),
     inset 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -860,13 +861,14 @@ html {
 }
 
 .audio-download-btn {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
   border-radius: 50%;
 }
 
 .audio-download-btn:hover {
-  background: var(--accent-hover);
+  background: var(--accent-color);
+  border-color: var(--accent-hover);
+  color: white;
+  text-decoration: none;
   transform: scale(1.05);
 }
 
@@ -974,7 +976,7 @@ html {
 .vu-bar.active[data-index="8"] {
   background-color: var(--accent-color); /* Teal */
   opacity: 1;
-  box-shadow: 
+  box-shadow:
     0 0 8px var(--accent-color),
     0 0 4px rgba(0, 121, 107, 0.8);
 }
@@ -985,7 +987,7 @@ html {
 .vu-bar.active[data-index="12"] {
   background-color: var(--secondary-accent); /* Orange */
   opacity: 1;
-  box-shadow: 
+  box-shadow:
     0 0 8px var(--secondary-accent),
     0 0 4px rgba(216, 67, 21, 0.8);
 }
@@ -993,7 +995,7 @@ html {
 .vu-bar.active[data-index="13"] {
   background-color: var(--error-color); /* Red peak */
   opacity: 1;
-  box-shadow: 
+  box-shadow:
     0 0 10px var(--error-color),
     0 0 6px rgba(198, 40, 40, 0.9);
 }
@@ -1088,7 +1090,7 @@ html {
   /* Physical button: raised effect with shadow */
   border: 1px solid var(--border-color);
   border-radius: 50%;
-  box-shadow: 
+  box-shadow:
     0 3px 0 rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
   width: 56px;
@@ -1107,7 +1109,7 @@ html {
   border-color: var(--accent-hover);
   color: white;
   transform: translateY(-1px);
-  box-shadow: 
+  box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.25),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
@@ -1115,7 +1117,7 @@ html {
 /* Tactile button press effect */
 .audio-btn:active {
   transform: translateY(2px);
-  box-shadow: 
+  box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.25),
     inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -1134,7 +1136,7 @@ html {
   color: white;
   /* Subtle lift effect - embossed feel */
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 5px 0 rgba(0, 0, 0, 0.3),
     inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
@@ -1142,7 +1144,7 @@ html {
 #audio-loop:active {
   /* Pressed button effect */
   transform: translateY(2px);
-  box-shadow: 
+  box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.25),
     inset 0 2px 3px rgba(0, 0, 0, 0.3);
 }
@@ -1151,7 +1153,7 @@ html {
 #audio-loop[data-mode="1"]:hover,
 #audio-loop[data-mode="2"]:hover {
   transform: translateY(-2px);
-  box-shadow: 
+  box-shadow:
     0 5px 0 rgba(0, 0, 0, 0.3),
     inset 0 2px 0 rgba(255, 255, 255, 0.4);
 }
@@ -1159,7 +1161,7 @@ html {
 #audio-loop[data-mode="1"]:active,
 #audio-loop[data-mode="2"]:active {
   transform: translateY(2px);
-  box-shadow: 
+  box-shadow:
     0 1px 0 rgba(0, 0, 0, 0.25),
     inset 0 2px 3px rgba(0, 0, 0, 0.3);
 }
@@ -1168,7 +1170,7 @@ html {
   background: var(--accent-color);
   border: 1px solid var(--accent-hover);
   border-radius: 50%;
-  box-shadow: 
+  box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
   width: 80px;
@@ -1185,14 +1187,14 @@ html {
 .audio-play-btn:hover {
   background: var(--accent-hover);
   transform: translateY(-1px) scale(1.05);
-  box-shadow: 
+  box-shadow:
     0 5px 0 rgba(0, 0, 0, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .audio-play-btn:active {
   transform: translateY(2px) scale(1.02);
-  box-shadow: 
+  box-shadow:
     0 2px 0 rgba(0, 0, 0, 0.3),
     inset 0 1px 2px rgba(0, 0, 0, 0.2);
 }
@@ -1670,7 +1672,7 @@ html {
 /* Minimized state for the player */
 .mini-player.minimized {
   /* Move completely off-screen but keep in DOM */
-  transform: translateY(200%) !important; 
+  transform: translateY(200%) !important;
   opacity: 0;
   pointer-events: none;
 }
@@ -1763,7 +1765,7 @@ body.mini-player-active.player-minimized {
     padding-bottom: calc(0.375rem + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.2);
   }
-  
+
   /* Remove enhanced shadow from album art on mobile */
   .mini-art {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -1874,7 +1876,7 @@ def get_audio_player_js():
   let midNode = null;
   let trebleNode = null;
   let analyserNode = null;
-  
+
   // Reverb effect nodes
   let reverbNode = null;      // ConvolverNode for reverb
   let reverbGainNode = null;  // Wet signal gain
@@ -2167,13 +2169,13 @@ def get_audio_player_js():
 
   async function loadAlbumArt(fileUrl) {
     currentFileUrl = fileUrl;
-    
+
     try {
       // Show loading overlay
       artLoading.style.display = 'flex';
 
       const response = await fetch(`/api/audio-metadata?file=${encodeURIComponent(fileUrl)}`);
-      
+
       if (!response.ok) {
         throw new Error('Metadata fetch failed');
       }
@@ -2219,7 +2221,7 @@ def get_audio_player_js():
     const track = currentPlaylist[index];
 
     audio.src = track.url;
-    
+
     // Update download buttons with current track URL
     if (miniDownloadBtn) {
       miniDownloadBtn.href = track.url;
@@ -2229,7 +2231,7 @@ def get_audio_player_js():
       audioDownloadBtn.href = track.url;
       audioDownloadBtn.download = track.name || '';
     }
-    
+
     // Update playlist UI
     Array.from(playlistEl.children).forEach((el, i) => {
       el.classList.toggle('active', i === index);
@@ -2258,7 +2260,7 @@ def get_audio_player_js():
       if (!audioContext) {
         initAudioContext();
       }
-      
+
       audio.play().then(() => {
         if (audioContext.state === 'suspended') {
           audioContext.resume();
@@ -2287,7 +2289,7 @@ def get_audio_player_js():
 
   function playNext() {
     normalizeLoopMode();
-    
+
     // Repeat current track: restart current track
     if (loopMode === 1) {
       audio.currentTime = 0;
@@ -2297,7 +2299,7 @@ def get_audio_player_js():
 
     // Move to next track
     let nextIndex = currentTrackIndex + 1;
-    
+
     // Handle end of playlist
     if (nextIndex >= currentPlaylist.length) {
       // Loop off: stop playback
@@ -2306,7 +2308,7 @@ def get_audio_player_js():
       stopVUMeter();
       return;
     }
-    
+
     playTrack(nextIndex);
   }
 
@@ -2322,10 +2324,10 @@ def get_audio_player_js():
     // Toggle between 0 (off) and 1 (repeat current track)
     loopMode = loopMode === 0 ? 1 : 0;
     normalizeLoopMode();
-    
+
     // Update visual state
     loopBtn.setAttribute('data-mode', String(loopMode));
-    
+
     // Update accessibility label
     const labels = ['Repeat off', 'Repeat'];
     loopBtn.setAttribute('aria-label', labels[loopMode]);
@@ -2432,7 +2434,7 @@ def get_audio_player_js():
     modal.style.display = 'none';
     miniPlayer.style.display = 'none';
     document.body.classList.remove('mini-player-active');
-    
+
     audio.pause();
     audio.src = '';
     stopVUMeter();
@@ -2457,7 +2459,7 @@ def get_audio_player_js():
 
   const updateProgress = throttle(() => {
     if (!isFinite(audio.duration)) return;
-    
+
     const progress = (audio.currentTime / audio.duration) * 100;
     progressBar.value = progress;
     timeCurrent.textContent = formatTime(audio.currentTime);
@@ -2626,7 +2628,7 @@ def get_audio_player_js():
 
   function toggleMiniMinimize() {
     const isMinimized = miniPlayer.classList.contains('minimized');
-    
+
     if (isMinimized) {
       // Restore
       miniPlayer.classList.remove('minimized');
