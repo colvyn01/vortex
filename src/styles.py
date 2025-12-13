@@ -213,8 +213,8 @@ body {
 }
 
 .server-stop-btn {
-  background: var(--secondary-accent);
-  border: 1px solid var(--secondary-accent);
+  background: var(--error-color);
+  border: 1px solid var(--error-color);
   color: var(--text-inverse);
   width: 24px;
   height: 24px;
@@ -793,7 +793,6 @@ a:active {
 
 .chat-message {
   padding: 0.5rem 0.6rem;
-  border-left: 3px solid var(--border-light);
   border-radius: 6px;
   background: var(--surface-alt);
   word-wrap: break-word;
@@ -802,8 +801,6 @@ a:active {
 
 .chat-message-own {
   background: var(--surface-main);
-  border-left-color: var(--accent-color);
-  border-left-width: 3px;
 }
 /* chat sender */
 
@@ -884,22 +881,22 @@ a:active {
   font-size: 0.65rem;
   font-weight: 600;
   font-family: var(--font-ui);
-  color: var(--text-main);
-  background: var(--surface-alt);
-  border: var(--border-width) solid var(--border-color);
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   cursor: pointer;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  transition: background 0.1s ease, color 0.1s ease, border-color 0.1s ease, transform 0.1s ease;
+  transition: all 0.2s ease;
   box-shadow: none;
 }
 
 .btn-manage-devices:hover {
-  background: var(--accent-color);
-  border-color: var(--accent-color);
-  color: var(--text-inverse);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  background: var(--surface-alt);
+  border-color: var(--text-dim);
+  color: var(--text-main);
+  box-shadow: none;
 }
 
 .btn-manage-devices:active {
@@ -918,10 +915,10 @@ a:active {
 }
 
 .btn-manage-bans:hover {
-  background: var(--error-color);
+  background: var(--surface-error);
   border-color: var(--error-color);
-  color: var(--text-inverse);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: var(--error-color);
+  box-shadow: none;
 }
 
 .btn-manage-bans:active {
@@ -942,7 +939,7 @@ a:active {
 
 .active-devices-section {
   background: var(--surface-main);
-  border: var(--border-width) solid var(--accent-color);
+  border: var(--border-width) solid var(--border-color);
   border-radius: 10px;
   margin-bottom: 0.5rem;
   max-height: 200px;
@@ -955,9 +952,9 @@ a:active {
   justify-content: space-between;
   align-items: center;
   padding: 0.4rem 0.6rem;
-  background: var(--accent-color);
-  color: var(--text-inverse);
-  border-bottom: var(--border-width) solid var(--accent-color);
+  background: var(--surface-alt);
+  color: var(--text-main);
+  border-bottom: var(--border-width) solid var(--border-color);
   font-size: 0.65rem;
   font-weight: 800;
   font-family: var(--font-ui);
@@ -967,9 +964,9 @@ a:active {
 
 .active-close {
   background: transparent;
-  border: 1px solid var(--text-inverse);
+  border: 1px solid var(--border-color);
   border-radius: 4px;
-  color: var(--text-inverse);
+  color: var(--text-dim);
   font-size: 1rem;
   font-weight: bold;
   line-height: 1;
@@ -980,8 +977,9 @@ a:active {
 }
 
 .active-close:hover {
-  background: var(--surface-main);
-  color: var(--accent-color);
+  background: var(--error-color);
+  border-color: var(--error-color);
+  color: var(--text-inverse);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
@@ -1011,7 +1009,6 @@ a:active {
   padding: 0.4rem 0.5rem;
   margin-bottom: 0.3rem;
   background: var(--surface-alt);
-  border-left: 3px solid var(--accent-color);
   border-radius: 6px;
   font-family: var(--font-ui);
 }
@@ -1141,7 +1138,6 @@ a:active {
   padding: 0.4rem 0.5rem;
   margin-bottom: 0.3rem;
   background: var(--surface-alt);
-  border-left: 3px solid var(--error-color);
   border-radius: 6px;
   font-family: var(--font-ui);
 }
