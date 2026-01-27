@@ -31,7 +31,7 @@ def get_image_viewer_html() -> str:
 <!-- Image Viewer Modal (z-10001, above audio player) -->
 <div id="image-viewer-modal" class="image-viewer-modal" style="display: none;">
   <div class="image-viewer-backdrop"></div>
-  
+
   <!-- Corner controls -->
   <div class="image-viewer-controls">
     <a id="image-download" class="image-viewer-btn image-download-btn" href="" download aria-label="Download image" title="Download">
@@ -45,7 +45,7 @@ def get_image_viewer_html() -> str:
       </svg>
     </button>
   </div>
-  
+
   <!-- Navigation arrows -->
   <button id="image-prev" class="image-nav-btn image-nav-prev" aria-label="Previous image" title="Previous (←)">
     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,7 +57,7 @@ def get_image_viewer_html() -> str:
       <path d="M9 18l6-6-6-6"/>
     </svg>
   </button>
-  
+
   <!-- Image container with zoom/pan -->
   <div id="image-container" class="image-container">
     <img id="image-viewer-img" class="image-viewer-img" alt="" draggable="false">
@@ -66,7 +66,7 @@ def get_image_viewer_html() -> str:
       <span class="image-loading-text">Loading...</span>
     </div>
   </div>
-  
+
   <!-- Image info bar -->
   <div id="image-info" class="image-info-bar">
     <span id="image-filename" class="image-filename"></span>
@@ -317,25 +317,25 @@ def get_image_viewer_css() -> str:
     top: 0.5rem;
     right: 0.5rem;
   }
-  
+
   .image-viewer-btn {
     width: 36px;
     height: 36px;
   }
-  
+
   .image-nav-btn {
     width: 40px;
     height: 40px;
   }
-  
+
   .image-nav-prev {
     left: 0.5rem;
   }
-  
+
   .image-nav-next {
     right: 0.5rem;
   }
-  
+
   .image-info-bar {
     padding: 0.5rem;
     font-size: 0.7rem;
@@ -348,7 +348,7 @@ def get_image_viewer_css() -> str:
     width: 52px;
     height: 52px;
   }
-  
+
   .image-viewer-btn {
     width: 44px;
     height: 44px;
@@ -854,7 +854,7 @@ def get_video_player_html() -> str:
 <!-- Video Player Modal (z-10001) -->
 <div id="video-player-modal" class="video-player-modal" style="display: none;">
   <div class="video-player-backdrop"></div>
-  
+
   <!-- Corner controls -->
   <div class="video-player-corner-controls">
     <a id="video-download" class="video-player-btn video-download-btn" href="" download aria-label="Download video" title="Download">
@@ -874,11 +874,11 @@ def get_video_player_html() -> str:
       </svg>
     </button>
   </div>
-  
+
   <!-- Video container -->
   <div id="video-container" class="video-container">
     <video id="video-element" preload="metadata" playsinline></video>
-    
+
     <!-- Play overlay (click to play) -->
     <div id="video-play-overlay" class="video-play-overlay">
       <div class="video-play-circle">
@@ -887,20 +887,20 @@ def get_video_player_html() -> str:
         </svg>
       </div>
     </div>
-    
+
     <!-- Loading overlay -->
     <div id="video-loading" class="video-loading" style="display: none;">
       <div class="video-loading-spinner"></div>
     </div>
   </div>
-  
+
   <!-- Custom Controls Bar -->
   <div id="video-controls" class="video-controls">
     <!-- Progress bar -->
     <div class="video-progress-container">
       <input type="range" id="video-progress" class="video-progress-bar" min="0" max="100" value="0" step="0.1">
     </div>
-    
+
     <!-- Control buttons row -->
     <div class="video-controls-row">
       <!-- Left: play/pause, volume, time -->
@@ -913,7 +913,7 @@ def get_video_player_html() -> str:
             <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
           </svg>
         </button>
-        
+
         <button id="video-mute-btn" class="video-ctrl-btn" aria-label="Mute">
           <svg id="video-volume-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
             <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/>
@@ -922,16 +922,16 @@ def get_video_player_html() -> str:
             <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
           </svg>
         </button>
-        
+
         <input type="range" id="video-volume" class="video-volume-slider" min="0" max="100" value="80" step="1">
-        
+
         <span class="video-time">
           <span id="video-time-current">0:00</span>
           <span class="video-time-sep">/</span>
           <span id="video-time-total">0:00</span>
         </span>
       </div>
-      
+
       <!-- Right: speed, fullscreen -->
       <div class="video-controls-right">
         <select id="video-speed" class="video-speed-select">
@@ -943,7 +943,7 @@ def get_video_player_html() -> str:
           <option value="1.5">1.5x</option>
           <option value="2">2x</option>
         </select>
-        
+
         <button id="video-fullscreen-btn" class="video-ctrl-btn" aria-label="Fullscreen">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/>
@@ -952,7 +952,7 @@ def get_video_player_html() -> str:
       </div>
     </div>
   </div>
-  
+
   <!-- File info -->
   <div id="video-info" class="video-info-bar">
     <span id="video-filename" class="video-filename"></span>
@@ -1293,24 +1293,24 @@ def get_video_player_css() -> str:
     top: 0.5rem;
     right: 0.5rem;
   }
-  
+
   .video-player-btn {
     width: 36px;
     height: 36px;
   }
-  
+
   .video-controls {
     padding: 1rem 0.5rem 0.5rem;
   }
-  
+
   .video-volume-slider {
     display: none;
   }
-  
+
   .video-time {
     font-size: 0.7rem;
   }
-  
+
   .video-info-bar {
     padding-right: 120px;
     font-size: 0.8rem;
@@ -1738,7 +1738,7 @@ def get_pdf_viewer_html() -> str:
   <div id="pdf-viewport" class="pdf-viewport">
     <!-- Multi-page container -->
     <div id="pdf-container" class="pdf-pages-container"></div>
-    
+
     <div id="pdf-loading" class="pdf-loading">
       <div class="pdf-loading-spinner"></div>
       <span class="pdf-loading-text">Loading PDF...</span>
@@ -2004,8 +2004,8 @@ def get_pdf_viewer_css() -> str:
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
-/* HUD hidden: reduce padding to immersive mode? 
-   Optional: keeping padding prevents jumpiness. 
+/* HUD hidden: reduce padding to immersive mode?
+   Optional: keeping padding prevents jumpiness.
    Let's keep padding for now to ensure content doesn't jump. */
 
 .pdf-viewport::-webkit-scrollbar {
@@ -2197,7 +2197,7 @@ def get_pdf_viewer_js() -> str:
     pages: [],
     renderTimeout: null,
     observer: null,
-    
+
     // Auto-fit Logic
     fitMode: 'width', // 'width', 'page', 'manual'
     pageOriginalWidth: 0,
@@ -2247,7 +2247,7 @@ def get_pdf_viewer_js() -> str:
     zoomInBtn = document.getElementById('pdf-zoom-in');
     zoomOutBtn = document.getElementById('pdf-zoom-out');
     zoomLevelEl = document.getElementById('pdf-zoom-level');
-    
+
     // Fit Toggle
     fitToggleBtn = document.getElementById('pdf-fit-toggle');
     iconFitWidth = document.getElementById('icon-fit-width');
@@ -2257,11 +2257,11 @@ def get_pdf_viewer_js() -> str:
     closeBtn.addEventListener('click', close);
     backdrop.addEventListener('click', close);
     liveToggle.addEventListener('click', toggleLive);
-    
+
     // Navigation
     prevBtn.addEventListener('click', function() { scrollToPage(getCurrentPageNum() - 1); });
     nextBtn.addEventListener('click', function() { scrollToPage(getCurrentPageNum() + 1); });
-    
+
     // Zoom
     zoomInBtn.addEventListener('click', zoomIn);
     zoomOutBtn.addEventListener('click', zoomOut);
@@ -2305,13 +2305,13 @@ def get_pdf_viewer_js() -> str:
   function resetHudTimer(e) {
     // Show HUD
     modal.classList.remove('hud-hidden');
-    
+
     clearTimeout(state.hudTimeout);
     state.hudTimeout = setTimeout(function() {
         // If mouse is not over a control, hide HUD
         // Simple check: we just hide it. If user hovers over controls, they might disappear?
-        // Let's rely on standard inactivity. 
-        // Improvement: Don't hide if hovering clickable elements? 
+        // Let's rely on standard inactivity.
+        // Improvement: Don't hide if hovering clickable elements?
         // For now, simpler is better as per instructions "Hide bars after 2 seconds of inactivity".
         modal.classList.add('hud-hidden');
     }, 2000);
@@ -2365,11 +2365,11 @@ def get_pdf_viewer_js() -> str:
       } else {
           state.fitMode = 'width';
       }
-      
+
       updateFitIcon();
       calculateSmartFit();
   }
-  
+
   function updateFitIcon() {
       if (state.fitMode === 'page') {
           iconFitWidth.style.display = 'none';
@@ -2389,7 +2389,7 @@ def get_pdf_viewer_js() -> str:
 
       var viewportW = viewport.clientWidth - 40; // Minus padding
       var viewportH = viewport.clientHeight - 40;
-      
+
       var scale = 1;
 
       if (state.fitMode === 'width') {
@@ -2411,7 +2411,7 @@ def get_pdf_viewer_js() -> str:
           state.fitMode = 'manual';
           updateFitIcon();
       }
-      
+
       var oldScale = state.scale;
       state.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
       updateZoomLevel();
@@ -2431,15 +2431,15 @@ def get_pdf_viewer_js() -> str:
       clearTimeout(state.renderTimeout);
       state.renderTimeout = setTimeout(function() {
         state.pages.forEach(function(p) { if(p) p.rendered = false; });
-        
+
         // Force check intersection for all pages
         // Hack: wiggle scroll to trigger intersection observer?
         // Or just iterate and check visibility manually:
         state.pages.forEach(function(p, i) {
             if (i > 0) renderPage(i); // renderPage checks rendered flag
         });
-        
-        // Or rely on scroll event? 
+
+        // Or rely on scroll event?
         // Re-observing might be needed if elements resized significantly out of view?
         // With IntersectionObserver, resizing element might change intersection ratio.
       }, 150);
@@ -2447,10 +2447,10 @@ def get_pdf_viewer_js() -> str:
 
   function zoomIn() { setZoom(state.scale + SCALE_STEP); }
   function zoomOut() { setZoom(state.scale - SCALE_STEP); }
-  function resetZoom() { 
-      state.fitMode = 'width'; 
+  function resetZoom() {
+      state.fitMode = 'width';
       updateFitIcon();
-      calculateSmartFit(); 
+      calculateSmartFit();
   }
 
   function updateZoomLevel() {
@@ -2488,7 +2488,7 @@ def get_pdf_viewer_js() -> str:
 
     modal.style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    
+
     // Initial HUD state
     resetHudTimer();
 
@@ -2502,22 +2502,33 @@ def get_pdf_viewer_js() -> str:
     state.isOpen = false;
     modal.style.display = 'none';
     document.body.style.overflow = '';
-    
+
     state.pdfDoc = null;
     pagesContainer.innerHTML = '';
     state.pages = [];
-    
+
+    // Stop file watcher if live mode was active
+    if (state.isLive) {
+        fetch('/api/watch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: '' })
+        }).catch(function(err) {
+            console.error('Failed to stop file watcher:', err);
+        });
+    }
+
     // Reset Live
     state.isLive = false;
     liveToggle.classList.remove('active');
     liveIndicatorContainer.style.display = 'none';
   }
-  
+
   function showLoading(msg) {
       loading.style.display = 'flex';
       loadingText.textContent = msg;
   }
-  
+
   function hideLoading() {
       loading.style.display = 'none';
   }
@@ -2539,7 +2550,7 @@ def get_pdf_viewer_js() -> str:
           var viewport = page.getViewport({ scale: 1.0 });
           state.pageOriginalWidth = viewport.width;
           state.pageOriginalHeight = viewport.height;
-          
+
           // Generate placeholders
           for (var i = 1; i <= numPages; i++) {
             var canvas = document.createElement('canvas');
@@ -2548,19 +2559,19 @@ def get_pdf_viewer_js() -> str:
             // Initial size based on original aspect ratio
             canvas.style.width = state.pageOriginalWidth + 'px';
             canvas.style.height = state.pageOriginalHeight + 'px';
-            
+
             pagesContainer.appendChild(canvas);
             state.observer.observe(canvas);
-            
+
             state.pages[i] = {
               rendered: false,
               rendering: false,
               canvas: canvas
             };
           }
-          
+
           hideLoading();
-          
+
           // Initial Smart Fit
           calculateSmartFit();
 
@@ -2617,7 +2628,7 @@ def get_pdf_viewer_js() -> str:
       pageState.rendering = false;
     });
   }
-  
+
   // Helpers
   function handleWheel(e) {
       if (e.ctrlKey) {
@@ -2634,9 +2645,9 @@ def get_pdf_viewer_js() -> str:
       if (e.key === 'ArrowRight') { scrollToPage(getCurrentPageNum() + 1); }
       if (e.key === '+' || e.key === '=') zoomIn();
       if (e.key === '-') zoomOut();
-      if (e.key === '0') resetZoom(); 
+      if (e.key === '0') resetZoom();
   }
-  
+
   function getCurrentPageNum() {
       // Find visible page
       // Simple approximation: scrollTop / avgHeight?
@@ -2645,7 +2656,7 @@ def get_pdf_viewer_js() -> str:
       // We implement custom intersection to update page number
       return parseInt(pageNumEl.textContent) || 1;
   }
-  
+
   function updateCurrentPageIndicator() {
       // Find page closest to center
       var middle = viewport.scrollTop + (viewport.clientHeight / 2);
