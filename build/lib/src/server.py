@@ -1638,49 +1638,39 @@ def get_local_ip(mode: str = "auto") -> Tuple[str, str]:
 
     Args:
         mode: Address detection mode.
-            - 'auto': Intelligent detection (try LAN, fallback to localhost)
+            - 'auto': Use hostname.local mDNS format
             - 'localhost': Force localhost only (127.0.0.1)
-            - 'lan': Force LAN detection (fail if no LAN found)
+            - 'lan': Use hostname.local (fail if hostname unavailable)
 
     Returns:
         Tuple of (bind_address, display_address).
         bind_address is always '0.0.0.0' for accepting connections.
-        display_address is the user-facing IP for sharing.
+        display_address is the user-facing hostname.local for sharing.
     """
     bind_address = "0.0.0.0"
 
     if mode == "localhost":
         return bind_address, "localhost"
 
-    # Try UDP socket trick with multiple DNS servers
-    for dns_server in DNS_SERVERS:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(1.0)
-            sock.connect(dns_server)
-            ip = sock.getsockname()[0]
-            sock.close()
-            # Skip IPv6 addresses (contain ':')
-            if ":" not in ip and not ip.startswith("127."):
-                return bind_address, ip
-        except OSError:
-            continue
-
-    # Fallback: try gethostname + gethostbyname
+    # Use mDNS-compatible hostname.local format
     try:
         hostname = socket.gethostname()
-        ip = socket.gethostbyname(hostname)
-        if ":" not in ip and not ip.startswith("127."):
-            return bind_address, ip
+        # Sanitize hostname for DNS compatibility
+        sanitized = hostname.lower().replace("_", "-").replace(" ", "-")
+        # Remove any invalid characters (keep alphanumeric and hyphens)
+        sanitized = "".join(c for c in sanitized if c.isalnum() or c == "-")
+        # Remove leading/trailing hyphens
+        sanitized = sanitized.strip("-")
+        if sanitized:
+            return bind_address, f"{sanitized}.local"
     except OSError:
         pass
 
-    # Final fallback
+    # Fallback
     if mode == "lan":
-        # LAN mode requires a LAN IP - fail if not found
-        raise RuntimeError("No LAN IP address found. Check your network connection.")
+        raise RuntimeError("Could not determine hostname for .local domain.")
 
-    return bind_address, FALLBACK_IP
+    return bind_address, "localhost"
 
 
 # Server Entry Point

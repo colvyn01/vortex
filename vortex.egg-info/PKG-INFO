@@ -285,14 +285,14 @@ The server will start in the current directory and display output like:
 ```
 Vortex active
 Serving directory: /Users/you/Desktop
-Share this on your network: http://192.168.1.100:8000
+Share this on your network: http://your-computer.local:8000
 Max concurrent connections: 100
 Press Ctrl+C to stop.
 ```
 
 ### Opening in Browser
 
-1. Copy the URL from the output (example: `http://192.168.1.100:8000`)
+1. Copy the URL from the output (example: `http://your-computer.local:8000`)
 2. Open a web browser on another device connected to the same WiFi network
 3. Paste the URL into the address bar
 4. You can now upload and download files
@@ -390,7 +390,7 @@ Default port is 8000. If this port is already in use, specify a different port:
 vortex start --port 3000
 ```
 
-Then access at: `http://192.168.1.100:3000`
+Then access at: `http://your-computer.local:3000`
 
 Common alternative ports:
 - 3000 - Standard development port
@@ -398,17 +398,22 @@ Common alternative ports:
 - 8080 - Common HTTP alternative
 - 9000 - High numbered port
 
-### Understanding IP Addresses
+### Understanding .local Domains
 
-When you start Vortex, you see an IP address like `192.168.1.100`. This is your local network address. Other devices must be on the same WiFi network to access it.
+When you start Vortex, you see a URL like `http://your-computer.local:8000`. This is an mDNS (Multicast DNS) address that allows other devices to find your computer by name instead of IP address. Other devices must be on the same WiFi network to access it.
 
-**Private IP ranges (local network only):**
-- 192.168.x.x (most common)
-- 10.x.x.x (enterprise networks)
-- 172.16.x.x to 172.31.x.x (less common)
+**How .local domains work:**
+- Your computer broadcasts its hostname on the local network
+- Other devices can resolve `your-computer.local` to find your computer
+- No configuration or DNS server required
+
+**mDNS Support by Platform:**
+- **macOS/iOS**: Built-in (Bonjour)
+- **Linux**: Usually pre-installed (Avahi)
+- **Windows 10+**: Built-in, or install [Bonjour Print Services](https://support.apple.com/kb/DL999)
 
 **Localhost (this computer only):**
-- 127.0.0.1 or `localhost`
+- Use `--mode localhost` to restrict access to `http://localhost:8000`
 
 ## Advanced Features
 
@@ -422,11 +427,11 @@ vortex start --mode auto
 
 **Available modes:**
 
-1. **auto (default)** - Automatically detects your LAN IP. Falls back to localhost if no network is available.
+1. **auto (default)** - Uses hostname.local mDNS format. Falls back to localhost if hostname unavailable.
 
 2. **localhost** - Binds to 127.0.0.1. Only accessible from this computer. Useful for testing.
 
-3. **lan** - Requires a LAN IP. Fails if no local network is detected. Useful when you always want LAN access.
+3. **lan** - Uses hostname.local. Fails if hostname cannot be determined.
 
 **Examples:**
 
@@ -465,10 +470,10 @@ Output:
 ```
 Vortex active
 Serving directory: /Users/you/Desktop
-Share this on your network: http://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8
+Share this on your network: http://your-computer.local:8000
 
 🔐 Token authentication ENABLED
-   Access URL: http://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8
+   Access URL: http://your-computer.local:8000/?token=a1b2c3d4e5f6g7h8
    Token: a1b2c3d4e5f6g7h8
 ```
 
@@ -490,7 +495,7 @@ This generates a new token. Previous tokens will no longer work.
 
 **Using tokens with clients:**
 
-In browser: `http://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8`
+In browser: `http://your-computer.local:8000?token=a1b2c3d4e5f6g7h8`
 
 In HTTP header: `X-Token: a1b2c3d4e5f6g7h8`
 
@@ -509,7 +514,7 @@ Output:
 ```
 Vortex active
 Serving directory: /Users/you/Desktop
-Share this on your network: https://192.168.1.100:8000
+Share this on your network: https://your-computer.local:8000
 
 🔒 HTTPS ENABLED (self-signed certificate)
    Browsers may show a security warning - this is expected.
@@ -529,7 +534,7 @@ When you visit an HTTPS URL, your browser will show a security warning.
 
 Chrome/Edge:
 1. Click "Advanced"
-2. Click "Proceed to 192.168.x.x (unsafe)"
+2. Click "Proceed to your-computer.local (unsafe)"
 
 Firefox:
 1. Click "Advanced"
@@ -586,10 +591,10 @@ Output:
 ```
 Vortex active
 Serving directory: /Users/you/Desktop
-Share this on your network: https://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8
+Share this on your network: https://your-computer.local:8000
 
 🔐 Token authentication ENABLED
-   Access URL: https://192.168.1.100:8000?token=a1b2c3d4e5f6g7h8
+   Access URL: https://your-computer.local:8000/?token=a1b2c3d4e5f6g7h8
    Token: a1b2c3d4e5f6g7h8
 
 🔒 HTTPS ENABLED (self-signed certificate)
