@@ -1,5 +1,5 @@
 # MIT License
-# Copyright (c) 2024 Vortex Contributors
+# Copyright (c) 2026 Vortex Contributors
 # See LICENSE file for full license text.
 
 """
@@ -322,4 +322,3 @@ def main() -> None:
             if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
                 input("\nPress Enter to exit...")
         return
-

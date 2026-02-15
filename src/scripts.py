@@ -1,5 +1,5 @@
 # MIT License
-# Copyright (c) 2024 Vortex Contributors
+# Copyright (c) 2026 Vortex Contributors
 # See LICENSE file for full license text.
 
 """
