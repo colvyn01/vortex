@@ -20,6 +20,7 @@ import os
 import queue
 import socket
 import ssl
+import sys
 import threading
 import time
 import uuid
@@ -576,7 +577,10 @@ class PooledHTTPServer(HTTPServer):
         except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError, OSError):
             # Client disconnected - normal behavior, no logging needed
             pass
-        except Exception:
+        except Exception as e:
+            # Catch all application errors to prevent thread death
+            # Log to stderr so admin is aware of the failure
+            print(f"Error handling request from {client_address}: {e}", file=sys.stderr)
             self.handle_error(request, client_address)
         finally:
             self.shutdown_request(request)
@@ -682,20 +686,31 @@ class VortexHandler(SimpleHTTPRequestHandler):
 
         Host is identified as:
         - Request from localhost (127.0.0.1 or ::1)
-        - Request from the server's own display address
+        - Request from any of the server's local network interfaces
+
+        Since we use hostname.local for display, the browser resolves this
+        to the machine's LAN IP. We check all local interfaces to detect
+        self-connections.
 
         Returns:
             True if request is from host, False otherwise.
         """
         client_ip = self.client_address[0]
 
-        # Check localhost
+        # Check localhost (covers both IPv4 and IPv6 loopback)
         if client_ip in ("127.0.0.1", "::1", "localhost"):
             return True
 
-        # Check if matches server's display address
-        if _server_display_address and client_ip == _server_display_address:
-            return True
+        # Check if client IP matches any local interface
+        # This handles the case where browser accesses hostname.local
+        # which resolves to the machine's own LAN IP
+        try:
+            hostname = socket.gethostname()
+            local_ips = socket.gethostbyname_ex(hostname)[2]
+            if client_ip in local_ips:
+                return True
+        except OSError:
+            pass
 
         return False
 
@@ -840,60 +855,44 @@ class VortexHandler(SimpleHTTPRequestHandler):
         """
         Handle a request to download directory contents as a ZIP file.
 
-        Creates an in-memory ZIP archive of all files in the directory
-        (not recursive) and streams it to the client.
+        Streams the ZIP archive of all files in the directory (recursive)
+        to the client on-the-fly, avoiding memory buffering.
 
         Args:
             dir_path: Path to the directory to zip.
             include_body: Whether to include body (False for HEAD requests).
         """
+        from .zip_stream import StreamableZip
+
         directory = Path(dir_path)
         dir_name = directory.name or "download"
         zip_filename = f"{dir_name}.zip"
 
-        # Build ZIP in memory to determine size for Content-Length
-        zip_buffer = io.BytesIO()
-
-        try:
-            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                for entry in directory.iterdir():
-                    try:
-                        if entry.is_file():
-                            zf.write(entry, entry.name)
-                    except (OSError, PermissionError):
-                        continue
-        except Exception as e:
-            self._send_error_safe(500, f"Failed to create ZIP: {e}")
-            return
-
-        zip_size = zip_buffer.tell()
-        zip_buffer.seek(0)
-
-        if zip_size == 0:
-            self._send_error_safe(404, "No files to download")
-            return
-
-        # Send response
+        # Send response headers
         self.send_response(200)
         self.send_header("Content-Type", CONTENT_TYPE_ZIP)
-        self.send_header("Content-Length", str(zip_size))
         self.send_header(
             "Content-Disposition", f'attachment; filename="{zip_filename}"'
         )
         self.send_header("Cache-Control", "no-cache")
+        # Signal that we are closing the connection after this stream
+        # since we don't know the content length in advance.
+        self.send_header("Connection", "close")
         self._send_security_headers()
         self.end_headers()
 
         # Stream ZIP content
         if include_body:
             try:
-                while True:
-                    chunk = zip_buffer.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
+                streamer = StreamableZip(dir_path)
+                for chunk in streamer:
                     self.wfile.write(chunk)
             except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
                 pass
+            except Exception as e:
+                # Log error during streaming (e.g. file read error)
+                # We cannot change the response code now since headers are sent.
+                print(f"Error streaming ZIP download: {e}", file=sys.stderr)
 
     # File Streaming
 

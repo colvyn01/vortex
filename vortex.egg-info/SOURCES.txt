@@ -13,6 +13,7 @@ src/styles.py
 src/ui.py
 src/upload.py
 src/utils.py
+src/zip_stream.py
 vortex.egg-info/PKG-INFO
 vortex.egg-info/SOURCES.txt
 vortex.egg-info/dependency_links.txt

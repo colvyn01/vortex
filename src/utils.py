@@ -22,6 +22,32 @@ from .constants import CONTENT_TYPE_OCTET, MIME_TYPES
 # Characters that are invalid in Windows filenames: \ / : * ? " < > |
 INVALID_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
 
+# Reserved filenames in Windows (case-insensitive)
+RESERVED_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "COM1",
+    "COM2",
+    "COM3",
+    "COM4",
+    "COM5",
+    "COM6",
+    "COM7",
+    "COM8",
+    "COM9",
+    "LPT1",
+    "LPT2",
+    "LPT3",
+    "LPT4",
+    "LPT5",
+    "LPT6",
+    "LPT7",
+    "LPT8",
+    "LPT9",
+}
+
 
 def sanitize_filename(filename: str) -> str:
     """
@@ -46,6 +72,11 @@ def sanitize_filename(filename: str) -> str:
     # Fallback if filename is empty after sanitization
     if not sanitized:
         sanitized = "uploaded_file"
+
+    # Check for Windows reserved filenames
+    base_name = os.path.splitext(sanitized)[0]
+    if base_name.upper() in RESERVED_NAMES:
+        sanitized = f"_{sanitized}"
 
     return sanitized
 

@@ -333,6 +333,11 @@ document.addEventListener('DOMContentLoaded', function() {
 				});
 
 				xhr.open('POST', window.location.pathname, true);
+				// Add device identity headers for upload progress notifications
+				var storedDeviceName = localStorage.getItem('device_name') || 'Unknown Device';
+				var storedDeviceId = localStorage.getItem('device_id') || '';
+				xhr.setRequestHeader('X-Device-Name', storedDeviceName);
+				xhr.setRequestHeader('X-Device-ID', storedDeviceId);
 				xhr.send(formData);
 			}
 
@@ -519,7 +524,8 @@ document.addEventListener('DOMContentLoaded', function() {
 		var storedDeviceId = localStorage.getItem('device_id');
 		var storedDeviceName = localStorage.getItem('device_name');
 
-		if (storedDeviceId && storedDeviceName) {
+		// Regenerate device name if it uses the old "Unknown-" prefix (legacy detection)
+		if (storedDeviceId && storedDeviceName && !storedDeviceName.startsWith('Unknown-')) {
 			// Ensure cookie is set
 			document.cookie = 'device_id=' + storedDeviceId + '; path=/; max-age=31536000';
 			return {
@@ -554,14 +560,49 @@ document.addEventListener('DOMContentLoaded', function() {
 	function detectDeviceType() {
 		var ua = navigator.userAgent;
 
+		// Mobile devices (check first, as they're more specific)
 		if (/iPhone/i.test(ua)) return 'iPhone';
 		if (/iPad/i.test(ua)) return 'iPad';
-		if (/Android/i.test(ua)) return 'Android';
-		if (/Windows/i.test(ua)) return 'Windows';
-		if (/Macintosh/i.test(ua)) return 'Mac';
-		if (/Linux/i.test(ua)) return 'Linux';
+		if (/iPod/i.test(ua)) return 'iPod';
 
-		return 'Unknown';
+		// Android devices
+		if (/Android/i.test(ua)) {
+			if (/Mobile/i.test(ua)) return 'Android-Phone';
+			return 'Android-Tablet';
+		}
+
+		// Desktop OS with browser detection
+		if (/Windows/i.test(ua)) {
+			if (/Edge/i.test(ua)) return 'Windows-Edge';
+			if (/Chrome/i.test(ua)) return 'Windows-Chrome';
+			if (/Firefox/i.test(ua)) return 'Windows-Firefox';
+			return 'Windows-PC';
+		}
+
+		if (/Macintosh|Mac OS X/i.test(ua)) {
+			if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) return 'Mac-Safari';
+			if (/Chrome/i.test(ua)) return 'Mac-Chrome';
+			if (/Firefox/i.test(ua)) return 'Mac-Firefox';
+			return 'Mac';
+		}
+
+		if (/Linux/i.test(ua) && !/Android/i.test(ua)) {
+			if (/Chrome/i.test(ua)) return 'Linux-Chrome';
+			if (/Firefox/i.test(ua)) return 'Linux-Firefox';
+			return 'Linux';
+		}
+
+		// Other mobile platforms
+		if (/BlackBerry|BB10/i.test(ua)) return 'BlackBerry';
+		if (/Windows Phone/i.test(ua)) return 'WindowsPhone';
+
+		// Fallback with browser info
+		if (/Chrome/i.test(ua)) return 'Chrome-Browser';
+		if (/Safari/i.test(ua)) return 'Safari-Browser';
+		if (/Firefox/i.test(ua)) return 'Firefox-Browser';
+		if (/Opera|OPR/i.test(ua)) return 'Opera-Browser';
+
+		return 'Browser';
 	}
 
 	/**
