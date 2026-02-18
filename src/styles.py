@@ -1566,4 +1566,120 @@ input[type="reset"]:focus-visible {
   outline-offset: 2px;
   box-shadow: none !important;
 }
+
+/* stop server confirmation modal */
+
+.stop-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.5);
+  justify-content: center;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.stop-modal-overlay.active {
+  display: flex;
+  opacity: 1;
+}
+
+.stop-modal {
+  background: var(--surface-color);
+  border: var(--border-width) solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  width: 90%;
+  max-width: 360px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  transform: scale(0.92);
+  transition: transform 0.2s ease;
+  font-family: var(--font-ui);
+}
+
+.stop-modal-overlay.active .stop-modal {
+  transform: scale(1);
+}
+
+.stop-modal-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.stop-modal-message {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  line-height: 1.5;
+  margin-bottom: 1.25rem;
+}
+
+.stop-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.stop-modal-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-family: var(--font-ui);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  min-height: 36px;
+  border: none;
+}
+
+.stop-modal-cancel {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-dim);
+}
+
+.stop-modal-cancel:hover {
+  background: var(--surface-alt);
+  color: var(--text-main);
+  border-color: var(--text-dim);
+}
+
+.stop-modal-confirm {
+  background: var(--error-color);
+  color: var(--text-inverse);
+}
+
+.stop-modal-confirm:hover {
+  box-shadow: 0 2px 8px rgba(var(--error-rgb), 0.4);
+  filter: brightness(1.1);
+}
+
+.stop-modal-btn:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 480px) {
+  .stop-modal {
+    width: 94%;
+    padding: 1.25rem;
+  }
+
+  .stop-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .stop-modal-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
 """

@@ -135,6 +135,16 @@ def render_layout(title: str, body_html: str) -> str:
       {body_html}
     </div>
   </div>
+<div id="stop-modal-overlay" class="stop-modal-overlay">
+  <div class="stop-modal">
+    <h2 class="stop-modal-title">Stop Server</h2>
+    <p class="stop-modal-message">This will shut down Vortex and disconnect all devices.</p>
+    <div class="stop-modal-actions">
+      <button id="stop-modal-cancel" class="stop-modal-btn stop-modal-cancel">Cancel</button>
+      <button id="stop-modal-confirm" class="stop-modal-btn stop-modal-confirm">Stop</button>
+    </div>
+  </div>
+</div>
 <script>{_COMPLETE_SCRIPTS}</script>
 </body>
 </html>

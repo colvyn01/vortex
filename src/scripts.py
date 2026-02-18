@@ -55,27 +55,68 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 	// Server Stop Button
-	// Handle server shutdown request (host only).
+	// Handle server shutdown request (host only) via confirmation modal.
 
 	var stopBtn = document.getElementById('server-stop-btn');
+	var stopModalOverlay = document.getElementById('stop-modal-overlay');
+	var stopModalCancel = document.getElementById('stop-modal-cancel');
+	var stopModalConfirm = document.getElementById('stop-modal-confirm');
+
+	function showStopModal() {
+		if (stopModalOverlay) {
+			stopModalOverlay.classList.add('active');
+		}
+	}
+
+	function hideStopModal() {
+		if (stopModalOverlay) {
+			stopModalOverlay.classList.remove('active');
+		}
+	}
+
 	if (stopBtn) {
 		stopBtn.addEventListener('click', function() {
-			if (confirm('Stop the Vortex server?')) {
-				fetch('/api/stop-server', { method: 'POST' })
-					.then(function(response) {
-						return response.json();
-					})
-					.then(function(data) {
-						if (data.success) {
-							showTerminationMessage();
-						} else {
-							alert(data.error || 'Failed to stop server');
-						}
-					})
-					.catch(function(err) {
-						console.error('Error stopping server:', err);
-					});
+			showStopModal();
+		});
+	}
+
+	if (stopModalCancel) {
+		stopModalCancel.addEventListener('click', function() {
+			hideStopModal();
+		});
+	}
+
+	if (stopModalOverlay) {
+		stopModalOverlay.addEventListener('click', function(e) {
+			if (e.target === stopModalOverlay) {
+				hideStopModal();
 			}
+		});
+	}
+
+	document.addEventListener('keydown', function(e) {
+		if (e.key === 'Escape' && stopModalOverlay && stopModalOverlay.classList.contains('active')) {
+			hideStopModal();
+		}
+	});
+
+	if (stopModalConfirm) {
+		stopModalConfirm.addEventListener('click', function() {
+			hideStopModal();
+			fetch('/api/stop-server', { method: 'POST' })
+				.then(function(response) {
+					return response.json();
+				})
+				.then(function(data) {
+					if (data.success) {
+						showTerminationMessage();
+					} else {
+						alert(data.error || 'Failed to stop server');
+					}
+				})
+				.catch(function(err) {
+					console.error('Error stopping server:', err);
+				});
 		});
 	}
 
