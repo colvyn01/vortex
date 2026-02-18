@@ -34,6 +34,9 @@ classifiers = [
 [project.scripts]
 vortex = "src.cli:main"
 
+[project.gui-scripts]
+vortex-bg = "src.cli:main"
+
 [project.urls]
 Repository = "https://github.com/colvyn01/vortex"
 

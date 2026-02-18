@@ -2,6 +2,7 @@ LICENSE
 README.md
 pyproject.toml
 src/__init__.py
+src/__main__.py
 src/audio_player.py
 src/cli.py
 src/constants.py

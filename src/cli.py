@@ -8,12 +8,18 @@ Command-line interface for Vortex file gateway.
 This module handles argument parsing and process management for starting
 and stopping the Vortex server. It provides cross-platform support for
 Windows and Unix systems.
+
+By default, ``vortex start`` launches the server in the background with no
+visible terminal window.  Use ``vortex start --foreground`` to keep the
+terminal attached (useful for debugging).
 """
 
 import argparse
 import os
 import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +31,11 @@ from .server import run_server
 DEFAULT_PORT = 8000
 DEFAULT_DIR = "."
 DEFAULT_MAX_PARALLEL = 4
+
+# Environment variable set in the background child process so it can detect
+# that it was spawned by ``_launch_background()`` and should suppress any
+# interactive prompts (e.g. "Press Enter to exit…").
+_VORTEX_BG_ENV = "_VORTEX_BG"
 
 
 # PID File Management
@@ -159,8 +170,6 @@ def _terminate_process(pid: int) -> bool:
     if sys.platform == "win32":
         # Windows: Use taskkill command
         # /F = force termination, /PID = specify process ID
-        import subprocess
-
         try:
             result = subprocess.run(
                 ["taskkill", "/F", "/PID", str(pid)],
@@ -177,6 +186,110 @@ def _terminate_process(pid: int) -> bool:
             return True
         except OSError:
             return False
+
+
+def _is_background_child() -> bool:
+    """Return True if this process was spawned as a background child."""
+    return os.environ.get(_VORTEX_BG_ENV) == "1"
+
+
+def _should_prompt() -> bool:
+    """Return True if an interactive "Press Enter" prompt is appropriate."""
+    if _is_background_child():
+        return False
+    return sys.platform == "win32" and sys.stdin and sys.stdin.isatty()
+
+
+# Background Launch
+# Re-spawns the server as a fully detached subprocess with no console window.
+
+
+def _launch_background(args: argparse.Namespace) -> None:
+    """
+    Launch the Vortex server as a detached background process.
+
+    Constructs a command equivalent to ``vortex start --foreground <flags>``
+    and spawns it as a fully detached subprocess.  The child writes the PID
+    file; the parent polls for it (up to 5 s) before printing a confirmation
+    and exiting.
+
+    Platform behaviour:
+    - **Windows**: ``CREATE_NO_WINDOW | DETACHED_PROCESS``; prefers
+      ``pythonw.exe`` so no console is allocated at all.
+    - **macOS / Linux**: ``start_new_session=True`` with stdout/stderr
+      sent to ``os.devnull``.
+    """
+    # Remove any stale PID file so we can detect the child's write
+    _remove_pid_file()
+
+    # Build the child command: python -m src start --foreground <flags>
+    cmd = [sys.executable, "-m", "src", "start", "--foreground"]
+
+    if args.port != DEFAULT_PORT:
+        cmd += ["--port", str(args.port)]
+    if args.dir != DEFAULT_DIR:
+        cmd += ["--dir", args.dir]
+    if args.https:
+        cmd.append("--https")
+    if args.secure:
+        cmd.append("--secure")
+    if args.new_token:
+        cmd.append("--new-token")
+    if args.mode != "auto":
+        cmd += ["--mode", args.mode]
+    if args.max_parallel != DEFAULT_MAX_PARALLEL:
+        cmd += ["--max-parallel", str(args.max_parallel)]
+
+    # Mark the child so it knows it is backgrounded
+    child_env = os.environ.copy()
+    child_env[_VORTEX_BG_ENV] = "1"
+
+    if sys.platform == "win32":
+        # On Windows prefer pythonw.exe to suppress console entirely
+        python_dir = Path(sys.executable).parent
+        pythonw = python_dir / "pythonw.exe"
+        if pythonw.exists():
+            cmd[0] = str(pythonw)
+
+        # CREATE_NO_WINDOW (0x08000000) prevents a new console window.
+        # DETACHED_PROCESS (0x00000008) detaches from the parent console.
+        creationflags = subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS
+        proc = subprocess.Popen(
+            cmd,
+            env=child_env,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
+        )
+    else:
+        # Unix: start a new session so the child survives terminal close
+        devnull = open(os.devnull, "w")
+        proc = subprocess.Popen(
+            cmd,
+            env=child_env,
+            stdin=subprocess.DEVNULL,
+            stdout=devnull,
+            stderr=devnull,
+            start_new_session=True,
+        )
+
+    # Wait for the child to write the PID file (up to 5 seconds)
+    pid = None
+    for _ in range(50):
+        time.sleep(0.1)
+        # Check the child hasn't crashed
+        if proc.poll() is not None:
+            print("Error: Vortex server failed to start.")
+            sys.exit(1)
+        pid = _read_pid_file()
+        if pid is not None:
+            break
+
+    if pid is not None:
+        print(f"Vortex server started in background (PID {pid}).")
+    else:
+        print(f"Vortex server launched (PID {proc.pid}), but PID file was not written.")
 
 
 # Argument Parser
@@ -236,6 +349,11 @@ def _create_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MAX_PARALLEL,
         help="Max parallel uploads",
     )
+    start_parser.add_argument(
+        "--foreground",
+        action="store_true",
+        help="Run in the foreground with terminal attached (default: background)",
+    )
 
     # STOP command
     subparsers.add_parser("stop", help="Stop the running Vortex server")
@@ -250,15 +368,14 @@ def main() -> None:
     """
     Parse command-line arguments and execute the appropriate action.
 
-    This is the main entry point for the `vortex` command.
+    This is the main entry point for the ``vortex`` command.
     """
     parser = _create_parser()
     args = parser.parse_args()
 
     if not args.command:
         parser.print_help()
-        # Keep CMD open on Windows
-        if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+        if _should_prompt():
             input("\nPress Enter to exit...")
         return
 
@@ -268,16 +385,14 @@ def main() -> None:
 
         if pid is None:
             print("No running Vortex server found.")
-            # Keep CMD open on Windows
-            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            if _should_prompt():
                 input("\nPress Enter to exit...")
             return
 
         if not _is_process_running(pid):
             print(f"Vortex server (PID {pid}) is not running.")
             _remove_pid_file()
-            # Keep CMD open on Windows
-            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            if _should_prompt():
                 input("\nPress Enter to exit...")
             return
 
@@ -287,8 +402,7 @@ def main() -> None:
             print("Vortex deactivated.")
         else:
             print("Failed to stop Vortex server.")
-        # Keep CMD open on Windows
-        if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+        if _should_prompt():
             input("\nPress Enter to exit...")
         return
 
@@ -299,12 +413,16 @@ def main() -> None:
         if existing_pid and _is_process_running(existing_pid):
             print(f"Vortex is already running (PID {existing_pid}).")
             print("Use 'vortex stop' to stop it first.")
-            # Keep CMD open on Windows
-            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            if _should_prompt():
                 input("\nPress Enter to exit...")
             return
 
-        # Write PID file and start server
+        # Background launch (default) — re-spawn as a detached child
+        if not args.foreground and not _is_background_child():
+            _launch_background(args)
+            return
+
+        # Foreground / background-child: run the server in this process
         _write_pid_file()
         try:
             run_server(
@@ -318,7 +436,6 @@ def main() -> None:
             )
         finally:
             _remove_pid_file()
-            # Keep CMD open on Windows
-            if sys.platform == "win32" and sys.stdin and sys.stdin.isatty():
+            if _should_prompt():
                 input("\nPress Enter to exit...")
         return

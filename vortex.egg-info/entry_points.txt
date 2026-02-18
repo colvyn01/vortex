@@ -1,2 +1,5 @@
 [console_scripts]
 vortex = src.cli:main
+
+[gui_scripts]
+vortex-bg = src.cli:main
