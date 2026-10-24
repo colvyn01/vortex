@@ -15,14 +15,16 @@ terminal attached (useful for debugging).
 """
 
 import argparse
+import ipaddress
 import os
+import re
 import signal
 import socket
 import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 from .server import run_server
 
@@ -228,6 +230,85 @@ def _get_lan_ip() -> Optional[str]:
     except OSError:
         pass
     return None
+
+
+# Host Detection
+# The web UI shows the stop button and host controls only to the host machine.
+# The original check compared the client IP with gethostbyname_ex(hostname),
+# which on many Linux systems (e.g. Arch) returns only 127.0.1.1, so a browser
+# on the same machine using the LAN IP or hostname.local was treated as a guest.
+
+_LOCAL_ADDR_TTL = 30.0
+_local_addr_cache = {"time": 0.0, "addrs": set()}
+
+
+def _collect_local_addresses() -> Set[str]:
+    """Collect IP addresses that belong to this machine."""
+    addrs = {"127.0.0.1", "::1"}
+
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None):
+            addrs.add(str(info[4][0]).split("%")[0])
+    except OSError:
+        pass
+
+    lan_ip = _get_lan_ip()
+    if lan_ip:
+        addrs.add(lan_ip)
+
+    if sys.platform.startswith("linux"):
+        try:
+            out = subprocess.run(
+                ["ip", "-o", "addr", "show"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+            ).stdout
+            for match in re.finditer(r"inet6?\s+([0-9a-fA-F:.]+)/", out):
+                addrs.add(match.group(1))
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    return addrs
+
+
+def _local_addresses() -> Set[str]:
+    """Return this machine's addresses, cached briefly for performance."""
+    now = time.time()
+    if now - _local_addr_cache["time"] > _LOCAL_ADDR_TTL or not _local_addr_cache["addrs"]:
+        _local_addr_cache["addrs"] = _collect_local_addresses()
+        _local_addr_cache["time"] = now
+    return _local_addr_cache["addrs"]
+
+
+def _install_host_detection() -> None:
+    """
+    Replace VortexHandler._is_host with a more robust implementation.
+
+    A client counts as the host when its IP is loopback or matches any
+    address assigned to this machine.
+    """
+    try:
+        from . import server as server_module
+
+        handler_cls = server_module.VortexHandler
+    except (ImportError, AttributeError):
+        return
+
+    def _is_host(self) -> bool:
+        client_ip = str(self.client_address[0]).split("%")[0]
+        if client_ip.lower().startswith("::ffff:"):
+            client_ip = client_ip[7:]
+
+        try:
+            if ipaddress.ip_address(client_ip).is_loopback:
+                return True
+        except ValueError:
+            return False
+
+        return client_ip in _local_addresses()
+
+    handler_cls._is_host = _is_host
 
 
 def _print_startup_info(args: argparse.Namespace, proc: subprocess.Popen) -> None:
@@ -515,6 +596,7 @@ def main() -> None:
 
         # Foreground / background-child: run the server in this process
         _write_pid_file()
+        _install_host_detection()
         try:
             run_server(
                 args.dir,
