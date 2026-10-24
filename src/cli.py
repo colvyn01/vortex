@@ -17,6 +17,7 @@ terminal attached (useful for debugging).
 import argparse
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -36,6 +37,10 @@ DEFAULT_MAX_PARALLEL = 4
 # that it was spawned by ``_launch_background()`` and should suppress any
 # interactive prompts (e.g. "Press Enter to exit…").
 _VORTEX_BG_ENV = "_VORTEX_BG"
+
+# Log file for the background server (macOS / Linux). Startup output and any
+# errors end up here instead of being discarded.
+_LOG_FILE = Path.home() / ".vortex" / "vortex.log"
 
 
 # PID File Management
@@ -200,6 +205,73 @@ def _should_prompt() -> bool:
     return sys.platform == "win32" and sys.stdin and sys.stdin.isatty()
 
 
+# Network Helpers
+
+
+def _get_lan_ip() -> Optional[str]:
+    """
+    Best-effort detection of this machine's LAN IPv4 address.
+
+    Opens a UDP socket towards a non-routable address (no packets are sent)
+    and reads the local address the OS selected. This works even when the
+    hostname is missing from /etc/hosts, which is common on Arch Linux.
+
+    Returns:
+        The LAN IP as a string, or None if it cannot be determined.
+    """
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            sock.connect(("10.255.255.255", 1))
+            ip = sock.getsockname()[0]
+        if ip and not ip.startswith("127."):
+            return ip
+    except OSError:
+        pass
+    return None
+
+
+def _print_startup_info(args: argparse.Namespace, proc: subprocess.Popen) -> None:
+    """
+    Print the background server's startup output and a direct-IP URL.
+
+    The ``hostname.local`` address printed by the server only works when
+    mDNS (Avahi / Bonjour) is available, so a plain-IP URL is shown as well.
+    If the child process dies, the tail of the log file is printed.
+    """
+    marker = "Max concurrent connections"
+    content = ""
+    for _ in range(30):  # up to ~3 seconds
+        try:
+            content = _LOG_FILE.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            content = ""
+        if marker in content or proc.poll() is not None:
+            break
+        time.sleep(0.1)
+
+    if proc.poll() is not None:
+        print("Error: Vortex server exited unexpectedly. Log output:")
+        print(content.strip() or "(log is empty)")
+        print(f"Full log: {_LOG_FILE}")
+        return
+
+    if content.strip():
+        print()
+        print(content.strip())
+
+    protocol = "https" if args.https else "http"
+    if args.mode == "localhost":
+        print(f"\nLocal URL: {protocol}://127.0.0.1:{args.port}/")
+    else:
+        lan_ip = _get_lan_ip()
+        if lan_ip:
+            print(
+                f"\nDirect URL (works without mDNS): {protocol}://{lan_ip}:{args.port}/"
+            )
+        print(f"Local URL: {protocol}://127.0.0.1:{args.port}/")
+    print(f"Server log: {_LOG_FILE}")
+
+
 # Background Launch
 # Re-spawns the server as a fully detached subprocess with no console window.
 
@@ -217,7 +289,8 @@ def _launch_background(args: argparse.Namespace) -> None:
     - **Windows**: ``CREATE_NO_WINDOW | DETACHED_PROCESS``; prefers
       ``pythonw.exe`` so no console is allocated at all.
     - **macOS / Linux**: ``start_new_session=True`` with stdout/stderr
-      sent to ``os.devnull``.
+      written to ``~/.vortex/vortex.log``; the startup output and a direct
+      IP URL are echoed by the parent.
     """
     # Remove any stale PID file so we can detect the child's write
     _remove_pid_file()
@@ -244,6 +317,8 @@ def _launch_background(args: argparse.Namespace) -> None:
     child_env = os.environ.copy()
     child_env[_VORTEX_BG_ENV] = "1"
 
+    log_enabled = False
+
     if sys.platform == "win32":
         # On Windows prefer pythonw.exe to suppress console entirely
         python_dir = Path(sys.executable).parent
@@ -263,16 +338,24 @@ def _launch_background(args: argparse.Namespace) -> None:
             creationflags=creationflags,
         )
     else:
-        # Unix: start a new session so the child survives terminal close
-        devnull = open(os.devnull, "w")
+        # Unix: start a new session so the child survives terminal close.
+        # Output goes to a log file (not /dev/null) so errors are visible.
+        child_env["PYTHONUNBUFFERED"] = "1"
+        try:
+            _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            log_handle = open(_LOG_FILE, "w", encoding="utf-8")
+            log_enabled = True
+        except OSError:
+            log_handle = open(os.devnull, "w")
         proc = subprocess.Popen(
             cmd,
             env=child_env,
             stdin=subprocess.DEVNULL,
-            stdout=devnull,
-            stderr=devnull,
+            stdout=log_handle,
+            stderr=log_handle,
             start_new_session=True,
         )
+        log_handle.close()  # child keeps its own copy of the descriptor
 
     # Wait for the child to write the PID file (up to 5 seconds)
     pid = None
@@ -281,6 +364,11 @@ def _launch_background(args: argparse.Namespace) -> None:
         # Check the child hasn't crashed
         if proc.poll() is not None:
             print("Error: Vortex server failed to start.")
+            if log_enabled:
+                try:
+                    print(_LOG_FILE.read_text(encoding="utf-8", errors="replace"))
+                except OSError:
+                    pass
             sys.exit(1)
         pid = _read_pid_file()
         if pid is not None:
@@ -290,6 +378,9 @@ def _launch_background(args: argparse.Namespace) -> None:
         print(f"Vortex server started in background (PID {pid}).")
     else:
         print(f"Vortex server launched (PID {proc.pid}), but PID file was not written.")
+
+    if log_enabled:
+        _print_startup_info(args, proc)
 
 
 # Argument Parser
