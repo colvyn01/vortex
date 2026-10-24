@@ -313,13 +313,13 @@ def _install_host_detection() -> None:
 
 def _print_startup_info(args: argparse.Namespace, proc: subprocess.Popen) -> None:
     """
-    Print the background server's startup output and a direct-IP URL.
+    Print the background server's startup output (macOS / Linux).
 
-    The ``hostname.local`` address printed by the server only works when
-    mDNS (Avahi / Bonjour) is available, so a plain-IP URL is shown as well.
-    If the child process dies, the tail of the log file is printed.
+    Shows the server's own startup lines (active notice, served directory,
+    share URL, plus any token / HTTPS notices) without the extra noise.
+    If the child process dies, the log output is printed instead.
     """
-    marker = "Max concurrent connections"
+    marker = "Share this on your network"
     content = ""
     for _ in range(30):  # up to ~3 seconds
         try:
@@ -336,21 +336,14 @@ def _print_startup_info(args: argparse.Namespace, proc: subprocess.Popen) -> Non
         print(f"Full log: {_LOG_FILE}")
         return
 
-    if content.strip():
-        print()
-        print(content.strip())
-
-    protocol = "https" if args.https else "http"
-    if args.mode == "localhost":
-        print(f"\nLocal URL: {protocol}://127.0.0.1:{args.port}/")
-    else:
-        lan_ip = _get_lan_ip()
-        if lan_ip:
-            print(
-                f"\nDirect URL (works without mDNS): {protocol}://{lan_ip}:{args.port}/"
-            )
-        print(f"Local URL: {protocol}://127.0.0.1:{args.port}/")
-    print(f"Server log: {_LOG_FILE}")
+    skip = ("Max concurrent connections", "Press Ctrl+C")
+    lines = [
+        line.rstrip()
+        for line in content.splitlines()
+        if line.strip() and not line.strip().startswith(skip)
+    ]
+    if lines:
+        print("\n".join(lines))
 
 
 # Background Launch
@@ -370,8 +363,8 @@ def _launch_background(args: argparse.Namespace) -> None:
     - **Windows**: ``CREATE_NO_WINDOW | DETACHED_PROCESS``; prefers
       ``pythonw.exe`` so no console is allocated at all.
     - **macOS / Linux**: ``start_new_session=True`` with stdout/stderr
-      written to ``~/.vortex/vortex.log``; the startup output and a direct
-      IP URL are echoed by the parent.
+      written to ``~/.vortex/vortex.log``; the startup output is echoed
+      by the parent.
     """
     # Remove any stale PID file so we can detect the child's write
     _remove_pid_file()
