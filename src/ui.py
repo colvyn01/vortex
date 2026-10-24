@@ -40,8 +40,30 @@ _AUDIO_PLAYER_CSS = get_audio_player_css()
 _MEDIA_VIEWER_CSS = (
     get_image_viewer_css() + "\n" + get_video_player_css() + "\n" + get_pdf_viewer_css()
 )
+
+# Cross-platform layout fixes. The UI font stack lists fonts that only exist on
+# some systems, so the fallback monospace font can be wider (e.g. on Linux).
+# Without min-width: 0 the chat input keeps its intrinsic width and pushes the
+# Send button past the edge of the panel, where it gets clipped.
+_LAYOUT_FIXES_CSS = """
+.chat-form #chat-input {
+  min-width: 0;
+  width: 100%;
+}
+
+.chat-form .btn-chat {
+  flex-shrink: 0;
+}
+"""
+
 _COMPLETE_STYLESHEET = (
-    CSS_STYLESHEET + "\n\n" + _AUDIO_PLAYER_CSS + "\n\n" + _MEDIA_VIEWER_CSS
+    CSS_STYLESHEET
+    + "\n\n"
+    + _AUDIO_PLAYER_CSS
+    + "\n\n"
+    + _MEDIA_VIEWER_CSS
+    + "\n\n"
+    + _LAYOUT_FIXES_CSS
 )
 
 _AUDIO_PLAYER_JS = get_audio_player_js()
