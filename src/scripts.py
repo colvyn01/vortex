@@ -445,6 +445,12 @@ document.addEventListener('DOMContentLoaded', function() {
 						if (newFileList && currentFileList) {
 							currentFileList.innerHTML = newFileList.innerHTML;
 							currentFileList.classList.remove('updating');
+							if (typeof applySorting === 'function') {
+								applySorting();
+							}
+							if (typeof applySearch === 'function') {
+								applySearch();
+							}
 						}
 
 						// Update path display
@@ -521,6 +527,321 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 
+	// Directory Sorting Implementation
+	var currentSortField = 'name'; // 'name' | 'mtime' | 'size'
+	var currentSortDir = 'asc';    // 'asc' | 'desc'
+
+	function stableNameTieBreaker(nameA, nameB) {
+		var lowerA = (nameA || '').toLowerCase();
+		var lowerB = (nameB || '').toLowerCase();
+		if (lowerA < lowerB) return -1;
+		if (lowerA > lowerB) return 1;
+		if (nameA < nameB) return -1;
+		if (nameA > nameB) return 1;
+		return 0;
+	}
+
+	function compareEntries(rowA, rowB, field, dir) {
+		var nameA = rowA.getAttribute('data-name') || '';
+		var nameB = rowB.getAttribute('data-name') || '';
+
+		if (field === 'name') {
+			var lowerA = nameA.toLowerCase();
+			var lowerB = nameB.toLowerCase();
+			if (lowerA < lowerB) return dir === 'desc' ? 1 : -1;
+			if (lowerA > lowerB) return dir === 'desc' ? -1 : 1;
+			if (nameA < nameB) return dir === 'desc' ? 1 : -1;
+			if (nameA > nameB) return dir === 'desc' ? -1 : 1;
+			return 0;
+		}
+
+		if (field === 'size') {
+			var sizeAAttr = rowA.getAttribute('data-size');
+			var sizeBAttr = rowB.getAttribute('data-size');
+			var hasA = sizeAAttr !== null && sizeAAttr !== '' && !isNaN(Number(sizeAAttr));
+			var hasB = sizeBAttr !== null && sizeBAttr !== '' && !isNaN(Number(sizeBAttr));
+
+			// Unavailable metadata explicitly sorted to end
+			if (hasA && !hasB) return -1;
+			if (!hasA && hasB) return 1;
+			if (!hasA && !hasB) return stableNameTieBreaker(nameA, nameB);
+
+			var valA = Number(sizeAAttr);
+			var valB = Number(sizeBAttr);
+			if (valA !== valB) {
+				return dir === 'desc' ? (valB - valA) : (valA - valB);
+			}
+			return stableNameTieBreaker(nameA, nameB);
+		}
+
+		if (field === 'mtime') {
+			var mtimeAAttr = rowA.getAttribute('data-mtime');
+			var mtimeBAttr = rowB.getAttribute('data-mtime');
+			var hasA = mtimeAAttr !== null && mtimeAAttr !== '' && !isNaN(Number(mtimeAAttr));
+			var hasB = mtimeBAttr !== null && mtimeBAttr !== '' && !isNaN(Number(mtimeBAttr));
+
+			// Unavailable metadata explicitly sorted to end
+			if (hasA && !hasB) return -1;
+			if (!hasA && hasB) return 1;
+			if (!hasA && !hasB) return stableNameTieBreaker(nameA, nameB);
+
+			var valA = Number(mtimeAAttr);
+			var valB = Number(mtimeBAttr);
+			if (valA !== valB) {
+				return dir === 'desc' ? (valB - valA) : (valA - valB);
+			}
+			return stableNameTieBreaker(nameA, nameB);
+		}
+
+		return stableNameTieBreaker(nameA, nameB);
+	}
+
+	function applySorting() {
+		var fileList = document.querySelector('.file-list');
+		if (!fileList) return;
+		var table = fileList.querySelector('table');
+		if (!table) return;
+
+		// Update column header aria-sort and sort-icon indicators
+		var ths = table.querySelectorAll('th');
+		ths.forEach(function(th) {
+			var btn = th.querySelector('.sort-header-btn');
+			var sortField = btn ? btn.getAttribute('data-sort') : th.getAttribute('data-sort');
+			if (!sortField) return;
+
+			var icon = th.querySelector('.sort-icon');
+			if (sortField === currentSortField) {
+				var isAsc = currentSortDir === 'asc';
+				th.setAttribute('aria-sort', isAsc ? 'ascending' : 'descending');
+				if (icon) icon.textContent = isAsc ? '▲' : '▼';
+			} else {
+				th.setAttribute('aria-sort', 'none');
+				if (icon) icon.textContent = '';
+			}
+		});
+
+		var tbody = table.querySelector('tbody');
+		if (!tbody) return;
+
+		var rows = Array.from(tbody.querySelectorAll('tr'));
+		if (rows.length === 0) return;
+
+		var parentRow = null;
+		var folderRows = [];
+		var fileRows = [];
+
+		rows.forEach(function(row) {
+			if (row.getAttribute('data-parent') === '1') {
+				parentRow = row;
+			} else if (row.getAttribute('data-isdir') === '1') {
+				folderRows.push(row);
+			} else {
+				fileRows.push(row);
+			}
+		});
+
+		// Folders: for Size sorting, keep folders sorted by name A-Z above files.
+		// For Name and Mtime sorting, folders are sorted by that field.
+		if (currentSortField === 'size') {
+			folderRows.sort(function(a, b) {
+				return stableNameTieBreaker(a.getAttribute('data-name'), b.getAttribute('data-name'));
+			});
+		} else {
+			folderRows.sort(function(a, b) {
+				return compareEntries(a, b, currentSortField, currentSortDir);
+			});
+		}
+
+		// Files: sort by currentSortField and currentSortDir
+		fileRows.sort(function(a, b) {
+			return compareEntries(a, b, currentSortField, currentSortDir);
+		});
+
+		// Re-append rows in order: parent row -> folders -> files
+		if (parentRow) {
+			tbody.appendChild(parentRow);
+		}
+		folderRows.forEach(function(row) {
+			tbody.appendChild(row);
+		});
+		fileRows.forEach(function(row) {
+			tbody.appendChild(row);
+		});
+
+		// Reapply active search filter to the freshly sorted rows
+		if (typeof applySearch === 'function') {
+			applySearch();
+		}
+	}
+
+	function handleSortClick(field) {
+		if (field === currentSortField) {
+			currentSortDir = currentSortDir === 'asc' ? 'desc' : 'asc';
+		} else {
+			currentSortField = field;
+			if (field === 'mtime' || field === 'size') {
+				currentSortDir = 'desc';
+			} else {
+				currentSortDir = 'asc';
+			}
+		}
+		applySorting();
+	}
+
+	// Expose sorting API on window for testing and programmatic control
+	window.VortexSort = {
+		apply: applySorting,
+		setSort: handleSortClick,
+		getState: function() {
+			return { field: currentSortField, dir: currentSortDir };
+		},
+		setState: function(field, dir) {
+			currentSortField = field;
+			currentSortDir = dir;
+			applySorting();
+		}
+	};
+
+	// Directory Search State and Implementation
+	var currentSearchQuery = '';
+
+	function applySearch() {
+		var fileList = document.querySelector('.file-list');
+		if (!fileList) return;
+		var table = fileList.querySelector('table');
+		if (!table) return;
+		var tbody = table.querySelector('tbody');
+		if (!tbody) return;
+
+		var existingNoMatches = typeof tbody.querySelector === 'function' ? tbody.querySelector('.no-matches-row') : null;
+		if (existingNoMatches && typeof existingNoMatches.remove === 'function') {
+			existingNoMatches.remove();
+		} else if (existingNoMatches && existingNoMatches.parentNode) {
+			existingNoMatches.parentNode.removeChild(existingNoMatches);
+		}
+
+		var query = (currentSearchQuery || '').trim().toLowerCase();
+		var rows = Array.from(tbody.querySelectorAll('tr'));
+		var visibleMatches = 0;
+		var nonParentRows = 0;
+
+		rows.forEach(function(row) {
+			if (!row.style) row.style = {};
+			// Always keep parent directory link accessible
+			if (row.getAttribute('data-parent') === '1') {
+				row.style.display = '';
+				return;
+			}
+
+			if (row.getAttribute('data-no-matches') === '1') {
+				return;
+			}
+
+			nonParentRows++;
+			var name = row.getAttribute('data-name') || '';
+			var isDir = row.getAttribute('data-isdir') === '1';
+
+			if (!query) {
+				row.style.display = '';
+				visibleMatches++;
+			} else {
+				// Case-insensitive literal substring matching
+				var lowerName = name.toLowerCase();
+				var isMatch = lowerName.indexOf(query) !== -1 || (isDir && (lowerName + '/').indexOf(query) !== -1);
+				if (isMatch) {
+					row.style.display = '';
+					visibleMatches++;
+				} else {
+					row.style.display = 'none';
+				}
+			}
+		});
+
+		// Show "No matching files or folders" when query is non-empty and 0 items match
+		if (query && visibleMatches === 0) {
+			var noMatchesRow = document.createElement('tr');
+			noMatchesRow.className = 'no-matches-row';
+			noMatchesRow.setAttribute('class', 'no-matches-row');
+			noMatchesRow.setAttribute('data-no-matches', '1');
+
+			var td = document.createElement('td');
+			td.setAttribute('colspan', '3');
+			td.textContent = 'No matching files or folders';
+
+			noMatchesRow.appendChild(td);
+			tbody.appendChild(noMatchesRow);
+		}
+
+		// Update clear-search button visibility
+		var clearBtn = document.getElementById('file-search-clear');
+		if (clearBtn) {
+			clearBtn.style.display = query ? '' : 'none';
+		}
+	}
+
+	function initSearch() {
+		var searchInput = document.getElementById('file-search-input');
+		var clearBtn = document.getElementById('file-search-clear');
+
+		if (searchInput) {
+			searchInput.addEventListener('input', function() {
+				currentSearchQuery = searchInput.value;
+				applySearch();
+			});
+
+			searchInput.addEventListener('search', function() {
+				currentSearchQuery = searchInput.value;
+				applySearch();
+			});
+
+			searchInput.addEventListener('keydown', function(e) {
+				if (e.key === 'Escape') {
+					searchInput.value = '';
+					currentSearchQuery = '';
+					applySearch();
+				}
+			});
+		}
+
+		if (clearBtn) {
+			clearBtn.addEventListener('click', function() {
+				if (searchInput) {
+					searchInput.value = '';
+					if (typeof searchInput.focus === 'function') {
+						searchInput.focus();
+					}
+				}
+				currentSearchQuery = '';
+				applySearch();
+			});
+		}
+	}
+
+	// Expose search API on window for testing and programmatic control
+	window.VortexSearch = {
+		apply: applySearch,
+		clear: function() {
+			var searchInput = document.getElementById('file-search-input');
+			if (searchInput) {
+				searchInput.value = '';
+			}
+			currentSearchQuery = '';
+			applySearch();
+		},
+		getQuery: function() {
+			return currentSearchQuery;
+		},
+		setQuery: function(q) {
+			currentSearchQuery = q || '';
+			var searchInput = document.getElementById('file-search-input');
+			if (searchInput) {
+				searchInput.value = currentSearchQuery;
+			}
+			applySearch();
+		}
+	};
+
+
 	// Chat and Real-Time Features
 	// Cross-device chat with polling, QR code generation, and directory size display
 
@@ -557,6 +878,12 @@ document.addEventListener('DOMContentLoaded', function() {
 	// Initialize Features
 	initializeChat();
 	initializeQRCode();
+	if (typeof applySorting === 'function') {
+		applySorting();
+	}
+	if (typeof initSearch === 'function') {
+		initSearch();
+	}
 	fetchDirectorySize();
 
 	/**
@@ -1244,6 +1571,12 @@ document.addEventListener('DOMContentLoaded', function() {
 				if (newFileList && currentFileList) {
 					currentFileList.innerHTML = newFileList.innerHTML;
 					currentFileList.classList.remove('updating');
+					if (typeof applySorting === 'function') {
+						applySorting();
+					}
+					if (typeof applySearch === 'function') {
+						applySearch();
+					}
 				}
 
 				// Refresh directory size
@@ -1536,6 +1869,22 @@ document.addEventListener('DOMContentLoaded', function() {
 				if (newFileList && currentFileList) {
 					currentFileList.innerHTML = newFileList.innerHTML;
 					currentFileList.classList.remove('updating');
+					// Clear search when changing directories
+					var searchInput = document.getElementById('file-search-input');
+					if (searchInput) {
+						searchInput.value = '';
+					}
+					currentSearchQuery = '';
+					var clearBtn = document.getElementById('file-search-clear');
+					if (clearBtn) {
+						clearBtn.style.display = 'none';
+					}
+					if (typeof applySorting === 'function') {
+						applySorting();
+					}
+					if (typeof applySearch === 'function') {
+						applySearch();
+					}
 				}
 
 				// Update path display
@@ -1643,7 +1992,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 		// Intercept directory link clicks
 		document.addEventListener('click', function(e) {
-			var target = e.target.closest('a');
+			var sortBtn = e.target && typeof e.target.closest === 'function' ? e.target.closest('.sort-header-btn') : null;
+			if (sortBtn && typeof handleSortClick === 'function') {
+				e.preventDefault();
+				e.stopPropagation();
+				var field = sortBtn.getAttribute('data-sort');
+				if (field) {
+					handleSortClick(field);
+				}
+				return;
+			}
+
+			var target = e.target && typeof e.target.closest === 'function' ? e.target.closest('a') : null;
 			if (!target) return;
 
 			var href = target.getAttribute('href');
@@ -1694,7 +2054,7 @@ document.addEventListener('DOMContentLoaded', function() {
 			var isDirectory = href.endsWith('/') || filename === '[..]';
 			if (!isDirectory) {
 				// Check if it has a file extension
-				var hasExtension = /\.[a-z0-9]+$/i.test(href.replace(/\/$/, ''));
+				var hasExtension = /\\.[a-z0-9]+$/i.test(href.replace(/\\/$/, ''));
 				if (hasExtension) return; // Let file downloads proceed normally
 			}
 

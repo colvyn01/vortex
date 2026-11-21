@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from src.server import VortexHandler
+from src.styles import CSS_STYLESHEET
 from src.ui import _build_file_table_rows
 
 
@@ -198,7 +199,53 @@ class DirectorySizeBackendTests(unittest.TestCase):
 
         # Parent link in subdirectory
         sub_rows = _build_file_table_rows(self.sub_dir, str(self.base_path))
-        self.assertIn('<tr><td><a href="../">[..]</a></td><td></td></tr>', sub_rows)
+        self.assertIn('<tr data-parent="1"><td><a href="../">[..]</a></td><td></td><td></td></tr>', sub_rows)
+
+    def test_ui_data_attributes_and_timestamps(self):
+        rows = _build_file_table_rows(self.base_path, str(self.base_path))
+        rows_str = "".join(rows)
+
+        # File data attributes (root.txt is 100 bytes)
+        self.assertIn('data-name="root.txt"', rows_str)
+        self.assertIn('data-size="100"', rows_str)
+        self.assertIn('data-isdir="0"', rows_str)
+        self.assertIn('data-mtime="', rows_str)
+
+        # Directory data attributes (subdir is a folder)
+        self.assertIn('data-name="subdir"', rows_str)
+        self.assertIn('data-size=""', rows_str)
+        self.assertIn('data-isdir="1"', rows_str)
+        self.assertIn('<td>-</td>', rows_str)
+
+    def test_ui_special_character_escaping(self):
+        # Create a file with quotes, ampersand, angle brackets in filename
+        special_name = 'test "quotes" & <angles>.txt'
+        (self.base_path / special_name).write_bytes(b"hello")
+
+        rows = _build_file_table_rows(self.base_path, str(self.base_path))
+        rows_str = "".join(rows)
+
+        # In data-name attribute, quotes and HTML special chars must be HTML entity escaped
+        self.assertIn('data-name="test &quot;quotes&quot; &amp; &lt;angles&gt;.txt"', rows_str)
+        # Visible link text should also escape HTML
+        self.assertIn('>test &quot;quotes&quot; &amp; &lt;angles&gt;.txt<', rows_str)
+
+    def test_desktop_panel_equal_height_styles(self):
+        # Desktop chat panel should stretch to row height without hardcoded max-height
+        self.assertIn(".panel-chat {", CSS_STYLESHEET)
+        self.assertIn("height: 100%;", CSS_STYLESHEET)
+        self.assertNotIn("max-height: 550px;", CSS_STYLESHEET)
+        self.assertNotIn("max-height: 450px;", CSS_STYLESHEET)
+
+        # Chat messages absorbs height and enables internal scrolling
+        self.assertIn(".chat-messages {", CSS_STYLESHEET)
+        self.assertIn("flex: 1;", CSS_STYLESHEET)
+        self.assertIn("min-height: 0;", CSS_STYLESHEET)
+        self.assertIn("overflow-y: auto;", CSS_STYLESHEET)
+
+        # Mobile layout maintains its natural height constraints
+        self.assertIn("@media (max-width: 900px)", CSS_STYLESHEET)
+        self.assertIn("max-height: 500px;", CSS_STYLESHEET)
 
 
 if __name__ == "__main__":

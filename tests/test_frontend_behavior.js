@@ -765,3 +765,742 @@ test("11. Startup sequence: Stale initial size request discarded if user navigat
     await new Promise((r) => setTimeout(r, 15));
     assert.strictEqual(currentLabel.textContent, "Total: Sub Size (5 files)");
 });
+
+// --- Directory Sorting Behavioral Tests ---
+
+function createSortingTestEnvironment(initialRowDefs) {
+    const docListeners = {};
+    const winListeners = {};
+    const elements = {};
+
+    const makeElement = (tag, attrs = {}, children = []) => {
+        const elListeners = {};
+        const el = {
+            tagName: tag.toUpperCase(),
+            getAttribute: (attr) => (attr in attrs ? attrs[attr] : null),
+            setAttribute: (attr, val) => { attrs[attr] = String(val); },
+            removeAttribute: (attr) => { delete attrs[attr]; },
+            classList: {
+                add: (c) => {
+                    const current = (attrs["class"] || "").split(/\s+/).filter(Boolean);
+                    if (!current.includes(c)) current.push(c);
+                    attrs["class"] = current.join(" ");
+                },
+                remove: (c) => {
+                    const current = (attrs["class"] || "").split(/\s+/).filter(Boolean);
+                    attrs["class"] = current.filter((x) => x !== c).join(" ");
+                },
+                contains: (c) => (attrs["class"] ? attrs["class"].split(/\s+/).includes(c) : false),
+            },
+            style: {},
+            focus: () => {},
+            get className() { return attrs["class"] || ""; },
+            set className(v) { attrs["class"] = String(v); },
+            textContent: "",
+            children: [...children],
+            listeners: elListeners,
+            addEventListener: (ev, fn) => {
+                elListeners[ev] = elListeners[ev] || [];
+                elListeners[ev].push(fn);
+            },
+            appendChild: (child) => {
+                child.parentNode = el;
+                const idx = el.children.indexOf(child);
+                if (idx !== -1) el.children.splice(idx, 1);
+                el.children.push(child);
+            },
+            remove: () => {
+                if (el.parentNode && el.parentNode.removeChild) {
+                    el.parentNode.removeChild(el);
+                }
+            },
+            querySelector: (sel) => null,
+            querySelectorAll: (sel) => [],
+            closest: (sel) => {
+                if (sel === ".sort-header-btn") {
+                    if (attrs["class"] && attrs["class"].includes("sort-header-btn")) return el;
+                    return null;
+                }
+                if (sel === "a") {
+                    if (tag.toLowerCase() === "a") return el;
+                    return null;
+                }
+                return null;
+            },
+        };
+        return el;
+    };
+
+    const makeRow = (def) => {
+        const attrs = {};
+        if (def.isParent) attrs["data-parent"] = "1";
+        if (def.name !== undefined) attrs["data-name"] = def.name;
+        if (def.isDir) attrs["data-isdir"] = "1";
+        else if (!def.isParent) attrs["data-isdir"] = "0";
+        if (def.size !== undefined && def.size !== null) attrs["data-size"] = String(def.size);
+        if (def.mtime !== undefined && def.mtime !== null) attrs["data-mtime"] = String(def.mtime);
+        return makeElement("tr", attrs);
+    };
+
+    const tbody = {
+        tagName: "TBODY",
+        children: initialRowDefs.map(makeRow),
+        querySelector: (sel) => {
+            if (sel === ".no-matches-row") {
+                return tbody.children.find((c) => c.classList && c.classList.contains("no-matches-row")) || null;
+            }
+            return null;
+        },
+        querySelectorAll: (sel) => {
+            if (sel === "tr") return tbody.children.slice();
+            return [];
+        },
+        appendChild: (row) => {
+            row.parentNode = tbody;
+            const idx = tbody.children.indexOf(row);
+            if (idx !== -1) tbody.children.splice(idx, 1);
+            tbody.children.push(row);
+        },
+        removeChild: (child) => {
+            const idx = tbody.children.indexOf(child);
+            if (idx !== -1) tbody.children.splice(idx, 1);
+        },
+    };
+
+    const makeTh = (sortField, labelText, defaultSort = "none") => {
+        const btnAttrs = { "class": "sort-header-btn", "data-sort": sortField };
+        const btn = makeElement("button", btnAttrs);
+
+        const labelSpan = makeElement("span");
+        labelSpan.textContent = labelText;
+
+        const iconSpan = makeElement("span", { "class": "sort-icon" });
+        iconSpan.textContent = defaultSort === "ascending" ? "▲" : (defaultSort === "descending" ? "▼" : "");
+
+        btn.children = [labelSpan, iconSpan];
+        btn.querySelector = (sel) => (sel === ".sort-icon" ? iconSpan : null);
+
+        const thAttrs = { "class": `col-${sortField}`, "aria-sort": defaultSort };
+        const th = makeElement("th", thAttrs, [btn]);
+        th.querySelector = (sel) => {
+            if (sel === ".sort-header-btn") return btn;
+            if (sel === ".sort-icon") return iconSpan;
+            return null;
+        };
+        return { th, btn, iconSpan };
+    };
+
+    const nameCol = makeTh("name", "Name", "ascending");
+    const mtimeCol = makeTh("mtime", "Last modified", "none");
+    const sizeCol = makeTh("size", "Size", "none");
+
+    const thead = makeElement("thead");
+    const table = {
+        tagName: "TABLE",
+        querySelector: (sel) => {
+            if (sel === "tbody") return tbody;
+            if (sel === "thead") return thead;
+            return null;
+        },
+        querySelectorAll: (sel) => {
+            if (sel === "th" || sel === "th[data-sort], th") return [nameCol.th, mtimeCol.th, sizeCol.th];
+            if (sel === "tr") return tbody.children.slice();
+            return [];
+        },
+    };
+
+    const fileList = {
+        tagName: "DIV",
+        querySelector: (sel) => (sel === "table" ? table : null),
+        classList: { add: () => {}, remove: () => {} },
+    };
+
+    const searchInput = makeElement("input", { id: "file-search-input", "class": "file-search-input" });
+    searchInput.value = "";
+    const searchClear = makeElement("button", { id: "file-search-clear", "class": "file-search-clear" });
+    searchClear.style = { display: "none" };
+
+    elements[".file-list"] = fileList;
+    elements["dir-size-info"] = makeElement("span", {}, []);
+    elements["session-data"] = makeElement("div", { "data-session-id": "sess-sort", "data-base-dir": "/base" });
+    elements["file-search-input"] = searchInput;
+    elements["file-search-clear"] = searchClear;
+
+    const doc = {
+        documentElement: makeElement("html"),
+        createElement: (tag) => makeElement(tag),
+        getElementById: (id) => elements[id] || null,
+        querySelector: (sel) => elements[sel] || null,
+        querySelectorAll: (sel) => (sel === "th" ? [nameCol.th, mtimeCol.th, sizeCol.th] : []),
+        addEventListener: (ev, fn) => {
+            docListeners[ev] = docListeners[ev] || [];
+            docListeners[ev].push(fn);
+        },
+    };
+
+    const win = {
+        location: { pathname: "/", href: "http://localhost:8000/" },
+        history: { pushState: () => {}, replaceState: () => {} },
+        matchMedia: () => ({ matches: false }),
+        addEventListener: (ev, fn) => {
+            winListeners[ev] = winListeners[ev] || [];
+            winListeners[ev].push(fn);
+        },
+        innerWidth: 800,
+    };
+
+    const runner = new Function(
+        "document", "window", "localStorage", "fetch", "EventSource",
+        fullScriptContent
+    );
+    const fetchImpl = async (url) => {
+        if (url && url.includes("/api/server-status")) {
+            throw new Error("server status offline in test");
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+    runner(doc, win, { getItem: () => null, setItem: () => {} }, fetchImpl, class { close() {} });
+
+    // Trigger DOMContentLoaded
+    for (const fn of (docListeners["DOMContentLoaded"] || [])) {
+        fn();
+    }
+
+    const clickSort = (field) => {
+        let btn = null;
+        if (field === "name") btn = nameCol.btn;
+        if (field === "mtime") btn = mtimeCol.btn;
+        if (field === "size") btn = sizeCol.btn;
+        for (const handler of (docListeners["click"] || [])) {
+            handler({
+                target: btn,
+                preventDefault: () => {},
+                stopPropagation: () => {},
+            });
+        }
+    };
+
+    const getRowNames = () => {
+        return tbody.children.map((r) => {
+            if (r.getAttribute("data-parent") === "1") return "[..]";
+            return r.getAttribute("data-name");
+        });
+    };
+
+    const typeSearch = (query) => {
+        searchInput.value = query;
+        for (const fn of (searchInput.listeners["input"] || [])) {
+            fn();
+        }
+    };
+
+    const pressSearchKey = (key) => {
+        for (const fn of (searchInput.listeners["keydown"] || [])) {
+            fn({ key });
+        }
+    };
+
+    const clickClearSearch = () => {
+        for (const fn of (searchClear.listeners["click"] || [])) {
+            fn();
+        }
+    };
+
+    const getVisibleRowNames = () => {
+        return tbody.children
+            .filter((r) => r.style.display !== "none")
+            .map((r) => {
+                if (r.getAttribute("data-parent") === "1") return "[..]";
+                if (r.getAttribute("data-no-matches") === "1") return "__NO_MATCHES__";
+                return r.getAttribute("data-name");
+            });
+    };
+
+    return {
+        table,
+        tbody,
+        nameCol,
+        mtimeCol,
+        sizeCol,
+        searchInput,
+        searchClear,
+        clickSort,
+        typeSearch,
+        pressSearchKey,
+        clickClearSearch,
+        getRowNames,
+        getVisibleRowNames,
+        win,
+        doc,
+        listeners: docListeners,
+    };
+}
+
+test("12. Sorting: Default sort is Name ascending, [..] is first, folders above files", () => {
+    const rows = [
+        { name: "zebra.txt", isDir: false, size: 100, mtime: 1000 },
+        { name: "Photos", isDir: true, mtime: 2000 },
+        { isParent: true },
+        { name: "alpha.txt", isDir: false, size: 200, mtime: 3000 },
+        { name: "Docs", isDir: true, mtime: 1500 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Default: [..] first, folders Docs & Photos A-Z, files alpha.txt & zebra.txt A-Z
+    const names = env.getRowNames();
+    assert.deepStrictEqual(names, ["[..]", "Docs", "Photos", "alpha.txt", "zebra.txt"]);
+    assert.strictEqual(env.nameCol.th.getAttribute("aria-sort"), "ascending");
+    assert.strictEqual(env.nameCol.iconSpan.textContent, "▲");
+    assert.strictEqual(env.mtimeCol.th.getAttribute("aria-sort"), "none");
+    assert.strictEqual(env.sizeCol.th.getAttribute("aria-sort"), "none");
+});
+
+test("13. Sorting: Toggling direction toggles Name between asc and desc", () => {
+    const rows = [
+        { isParent: true },
+        { name: "b_folder", isDir: true },
+        { name: "a_folder", isDir: true },
+        { name: "1_file.txt", isDir: false },
+        { name: "2_file.txt", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Initial: A-Z
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_folder", "b_folder", "1_file.txt", "2_file.txt"]);
+
+    // Click Name -> desc
+    env.clickSort("name");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "b_folder", "a_folder", "2_file.txt", "1_file.txt"]);
+    assert.strictEqual(env.nameCol.th.getAttribute("aria-sort"), "descending");
+    assert.strictEqual(env.nameCol.iconSpan.textContent, "▼");
+
+    // Click Name again -> asc
+    env.clickSort("name");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_folder", "b_folder", "1_file.txt", "2_file.txt"]);
+    assert.strictEqual(env.nameCol.th.getAttribute("aria-sort"), "ascending");
+    assert.strictEqual(env.nameCol.iconSpan.textContent, "▲");
+});
+
+test("14. Sorting: Switching to Last modified defaults to newest first (desc), clicking again toggles to asc", () => {
+    const rows = [
+        { isParent: true },
+        { name: "old_dir", isDir: true, mtime: 100 },
+        { name: "new_dir", isDir: true, mtime: 500 },
+        { name: "old_file.txt", isDir: false, mtime: 150 },
+        { name: "new_file.txt", isDir: false, mtime: 900 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Click Last modified -> newly selected column defaults to desc (newest first)
+    env.clickSort("mtime");
+    assert.strictEqual(env.mtimeCol.th.getAttribute("aria-sort"), "descending");
+    assert.strictEqual(env.mtimeCol.iconSpan.textContent, "▼");
+    assert.strictEqual(env.nameCol.th.getAttribute("aria-sort"), "none");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "new_dir", "old_dir", "new_file.txt", "old_file.txt"]);
+
+    // Click Last modified again -> toggles to asc (oldest first)
+    env.clickSort("mtime");
+    assert.strictEqual(env.mtimeCol.th.getAttribute("aria-sort"), "ascending");
+    assert.strictEqual(env.mtimeCol.iconSpan.textContent, "▲");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "old_dir", "new_dir", "old_file.txt", "new_file.txt"]);
+});
+
+test("15. Sorting: Switching to Size defaults to largest first (desc), clicking again toggles to asc", () => {
+    const rows = [
+        { isParent: true },
+        { name: "folder1", isDir: true },
+        { name: "small.txt", isDir: false, size: 50 },
+        { name: "huge.txt", isDir: false, size: 1000000 },
+        { name: "med.txt", isDir: false, size: 5000 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Click Size -> newly selected column defaults to desc (largest first)
+    env.clickSort("size");
+    assert.strictEqual(env.sizeCol.th.getAttribute("aria-sort"), "descending");
+    assert.strictEqual(env.sizeCol.iconSpan.textContent, "▼");
+    assert.strictEqual(env.nameCol.th.getAttribute("aria-sort"), "none");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "folder1", "huge.txt", "med.txt", "small.txt"]);
+
+    // Click Size again -> toggles to asc (smallest first)
+    env.clickSort("size");
+    assert.strictEqual(env.sizeCol.th.getAttribute("aria-sort"), "ascending");
+    assert.strictEqual(env.sizeCol.iconSpan.textContent, "▲");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "folder1", "small.txt", "med.txt", "huge.txt"]);
+});
+
+test("16. Sorting: Numeric byte count sorting works properly (not alphabetical string sort)", () => {
+    // "1000" is alphabetically smaller than "20", but numerically 1000 > 20
+    const rows = [
+        { isParent: true },
+        { name: "item_20.txt", isDir: false, size: 20 },
+        { name: "item_1000.txt", isDir: false, size: 1000 },
+        { name: "item_5.txt", isDir: false, size: 5 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Size desc -> 1000, 20, 5
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "item_1000.txt", "item_20.txt", "item_5.txt"]);
+
+    // Size asc -> 5, 20, 1000
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "item_5.txt", "item_20.txt", "item_1000.txt"]);
+});
+
+test("17. Sorting: Equal size and mtime values use stable filename tie-breaker", () => {
+    const rows = [
+        { isParent: true },
+        { name: "c_same.txt", isDir: false, size: 100, mtime: 500 },
+        { name: "a_same.txt", isDir: false, size: 100, mtime: 500 },
+        { name: "b_same.txt", isDir: false, size: 100, mtime: 500 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Under Size desc, tie-breaker produces a_same, b_same, c_same
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_same.txt", "b_same.txt", "c_same.txt"]);
+
+    // Under Mtime desc, tie-breaker produces a_same, b_same, c_same
+    env.clickSort("mtime");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_same.txt", "b_same.txt", "c_same.txt"]);
+});
+
+test("18. Sorting: Unavailable size metadata placed at end (not treated as 0 bytes)", () => {
+    const rows = [
+        { isParent: true },
+        { name: "zero_byte.txt", isDir: false, size: 0 },
+        { name: "normal.txt", isDir: false, size: 100 },
+        { name: "unknown_size.txt", isDir: false, size: "" }, // stat failed
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // In Size desc: normal (100) -> zero_byte (0) -> unknown_size (at end)
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "normal.txt", "zero_byte.txt", "unknown_size.txt"]);
+
+    // In Size asc: zero_byte (0) -> normal (100) -> unknown_size (at end)
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "zero_byte.txt", "normal.txt", "unknown_size.txt"]);
+});
+
+test("19. Sorting: Unavailable timestamp metadata placed at end (not treated as epoch 0)", () => {
+    const rows = [
+        { isParent: true },
+        { name: "epoch_file.txt", isDir: false, mtime: 0 },
+        { name: "recent_file.txt", isDir: false, mtime: 1700000000 },
+        { name: "unknown_mtime.txt", isDir: false, mtime: "" }, // stat failed
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // In Mtime desc: recent -> epoch -> unknown
+    env.clickSort("mtime");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "recent_file.txt", "epoch_file.txt", "unknown_mtime.txt"]);
+
+    // In Mtime asc: epoch -> recent -> unknown
+    env.clickSort("mtime");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "epoch_file.txt", "recent_file.txt", "unknown_mtime.txt"]);
+});
+
+test("20. Sorting: Size sort keeps folders name-sorted A-Z above size-sorted files", () => {
+    const rows = [
+        { isParent: true },
+        { name: "z_dir", isDir: true },
+        { name: "a_dir", isDir: true },
+        { name: "file_huge.txt", isDir: false, size: 999999 },
+        { name: "file_tiny.txt", isDir: false, size: 10 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Size desc: folders stay name-sorted A-Z (a_dir, z_dir) above files sorted by size desc
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_dir", "z_dir", "file_huge.txt", "file_tiny.txt"]);
+
+    // Size asc: folders still stay name-sorted A-Z above files sorted by size asc
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "a_dir", "z_dir", "file_tiny.txt", "file_huge.txt"]);
+});
+
+test("21. Sorting: Preserves sort state after navigation and DOM replacement", () => {
+    const rowsInitial = [
+        { isParent: true },
+        { name: "file_b.txt", isDir: false, size: 200 },
+        { name: "file_a.txt", isDir: false, size: 100 },
+    ];
+    const env = createSortingTestEnvironment(rowsInitial);
+
+    // Set sort to Size asc
+    env.clickSort("size"); // desc
+    env.clickSort("size"); // asc
+    assert.strictEqual(env.sizeCol.th.getAttribute("aria-sort"), "ascending");
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "file_a.txt", "file_b.txt"]);
+
+    // Simulate navigation/upload refresh: new rows loaded into tbody in server order
+    // (e.g. server default Name asc: file_1 (900), file_2 (50))
+    const makeRow = (def) => {
+        const attrs = {};
+        if (def.isParent) attrs["data-parent"] = "1";
+        if (def.name !== undefined) attrs["data-name"] = def.name;
+        if (def.isDir) attrs["data-isdir"] = "1";
+        else if (!def.isParent) attrs["data-isdir"] = "0";
+        if (def.size !== undefined) attrs["data-size"] = String(def.size);
+        const el = {
+            getAttribute: (a) => attrs[a] || null,
+            setAttribute: (a, v) => { attrs[a] = String(v); },
+            style: {},
+        };
+        return el;
+    };
+    const newRows = [
+        makeRow({ isParent: true }),
+        makeRow({ name: "file_1.txt", isDir: false, size: 900 }),
+        makeRow({ name: "file_2.txt", isDir: false, size: 50 }),
+    ];
+    env.tbody.children = newRows;
+
+    // Apply sorting (as navigateToDirectory or refreshFileList does)
+    env.win.VortexSort.apply();
+
+    // Verify sort state (Size asc) was preserved and applied to new rows
+    assert.deepStrictEqual(env.getRowNames(), ["[..]", "file_2.txt", "file_1.txt"]);
+    assert.strictEqual(env.sizeCol.th.getAttribute("aria-sort"), "ascending");
+});
+
+// --- Search Behavioral Tests ---
+
+test("22. Search: Case-insensitive filtering of files and folders", () => {
+    const rows = [
+        { isParent: true },
+        { name: "Documents", isDir: true },
+        { name: "Photos", isDir: true },
+        { name: "doc_summary.pdf", isDir: false },
+        { name: "notes.txt", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Initial: all items visible
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "Documents", "Photos", "doc_summary.pdf", "notes.txt"]);
+
+    // Type "doc" (case-insensitive) -> matches "Documents" and "doc_summary.pdf"
+    env.typeSearch("doc");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "Documents", "doc_summary.pdf"]);
+    assert.strictEqual(env.searchClear.style.display, "");
+
+    // Match folder with trailing slash: "photos/"
+    env.typeSearch("photos/");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "Photos"]);
+});
+
+test("23. Search: Literal special characters match literally without regex interpretation", () => {
+    const rows = [
+        { isParent: true },
+        { name: "report (final).pdf", isDir: false },
+        { name: "report 1.pdf", isDir: false },
+        { name: "archive.v1.0.tar.gz", isDir: false },
+        { name: "star*file.txt", isDir: false },
+        { name: "[draft] notes.txt", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Search "(final)" -> parentheses are literal characters, not regex capture groups
+    env.typeSearch("(final)");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "report (final).pdf"]);
+
+    // Search "[draft]" -> brackets are literal characters, not regex character classes
+    env.typeSearch("[draft]");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "[draft] notes.txt"]);
+
+    // Search "*" -> literal asterisk, not regex quantifier
+    env.typeSearch("*");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "star*file.txt"]);
+
+    // Search ".tar.gz" -> literal dots, not any-character wildcards
+    env.typeSearch(".tar.gz");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "archive.v1.0.tar.gz"]);
+});
+
+test("24. Search: Zero matches displays 'No matching files or folders' placeholder", () => {
+    const rows = [
+        { isParent: true },
+        { name: "alpha.txt", isDir: false },
+        { name: "beta.txt", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Search for nonexistent term
+    env.typeSearch("nonexistent_term");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "__NO_MATCHES__"]);
+
+    const noMatchesEl = env.tbody.children.find((c) => c.getAttribute("data-no-matches") === "1");
+    assert.ok(noMatchesEl, "No matches row is rendered");
+    assert.strictEqual(noMatchesEl.children[0].textContent, "No matching files or folders");
+
+    // Clearing query removes no-matches row and restores all rows
+    env.typeSearch("");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "alpha.txt", "beta.txt"]);
+    const noMatchesAfter = env.tbody.children.find((c) => c.getAttribute("data-no-matches") === "1");
+    assert.strictEqual(noMatchesAfter, undefined);
+});
+
+test("25. Search: Clear button and Escape key restore full listing and focus", () => {
+    const rows = [
+        { isParent: true },
+        { name: "cat.png", isDir: false },
+        { name: "dog.png", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Filter by "cat"
+    env.typeSearch("cat");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "cat.png"]);
+    assert.strictEqual(env.searchClear.style.display, "");
+
+    // Click clear button
+    env.clickClearSearch();
+    assert.strictEqual(env.searchInput.value, "");
+    assert.strictEqual(env.searchClear.style.display, "none");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "cat.png", "dog.png"]);
+
+    // Filter by "dog" and press Escape
+    env.typeSearch("dog");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "dog.png"]);
+    env.pressSearchKey("Escape");
+    assert.strictEqual(env.searchInput.value, "");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "cat.png", "dog.png"]);
+});
+
+test("26. Search: Sorting applies to filtered results", () => {
+    const rows = [
+        { isParent: true },
+        { name: "project_small.zip", isDir: false, size: 50 },
+        { name: "project_huge.zip", isDir: false, size: 50000 },
+        { name: "project_med.zip", isDir: false, size: 500 },
+        { name: "unrelated.txt", isDir: false, size: 10 },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Search "project" -> 3 matching files
+    env.typeSearch("project");
+    // Default sort is Name asc
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "project_huge.zip", "project_med.zip", "project_small.zip"]);
+
+    // Click Size sort -> desc (largest first)
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "project_huge.zip", "project_med.zip", "project_small.zip"]);
+
+    // Click Size sort again -> asc (smallest first)
+    env.clickSort("size");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "project_small.zip", "project_med.zip", "project_huge.zip"]);
+
+    // Non-matching file remains hidden
+    const unrelatedRow = env.tbody.children.find((r) => r.getAttribute("data-name") === "unrelated.txt");
+    assert.strictEqual(unrelatedRow.style.display, "none");
+});
+
+test("27. Search: Directory navigation clears the search query", async () => {
+    const rows = [
+        { isParent: true },
+        { name: "sub", isDir: true },
+        { name: "file.txt", isDir: false },
+    ];
+    let navFetchUrl = null;
+    const mockFetch = async (url) => {
+        navFetchUrl = url;
+        if (url === "/sub/") {
+            return {
+                ok: true,
+                text: async () => `
+                    <div class="file-list">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="col-name" aria-sort="ascending"><button type="button" class="sort-header-btn" data-sort="name"><span>Name</span><span class="sort-icon">▲</span></button></th>
+                                    <th scope="col" class="col-mtime" aria-sort="none"><button type="button" class="sort-header-btn" data-sort="mtime"><span>Last modified</span><span class="sort-icon"></span></button></th>
+                                    <th scope="col" class="col-size" aria-sort="none"><button type="button" class="sort-header-btn" data-sort="size"><span>Size</span><span class="sort-icon"></span></button></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr data-parent="1"><td><a href="../">[..]</a></td><td></td><td></td></tr>
+                                <tr data-name="sub_file.txt" data-isdir="0" data-size="100"><td><a href="sub_file.txt">sub_file.txt</a></td><td></td><td>100 B</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="device-subheader"><span>/sub/</span><span id="dir-size-info">Calculating size...</span></div>
+                    <div id="session-data" data-base-dir="/base" data-session-id="sess-1"></div>
+                `,
+            };
+        }
+        return { ok: true, json: async () => ({}) };
+    };
+
+    const env = createStartupEnvironment({ pathname: "/", mockFetch });
+    env.triggerDOMContentLoaded();
+
+    // Set search query in window.VortexSearch
+    env.win.VortexSearch.setQuery("test-filter");
+    assert.strictEqual(env.win.VortexSearch.getQuery(), "test-filter");
+
+    // Click directory link to navigate to /sub/
+    const linkTarget = {
+        closest: (sel) => (sel === "a" ? {
+            getAttribute: (attr) => (attr === "href" ? "/sub/" : null),
+            textContent: "sub/",
+        } : null),
+    };
+    const clickHandler = env.listeners["click"][0];
+    clickHandler({
+        target: linkTarget,
+        preventDefault: () => {},
+        stopPropagation: () => {},
+    });
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Verify search query was cleared on directory change
+    assert.strictEqual(env.win.VortexSearch.getQuery(), "");
+});
+
+test("28. Search: Upload refresh within same directory preserves search query and re-applies filter", () => {
+    const rows = [
+        { isParent: true },
+        { name: "log1.txt", isDir: false },
+        { name: "image.png", isDir: false },
+    ];
+    const env = createSortingTestEnvironment(rows);
+
+    // Active search filter: "log"
+    env.typeSearch("log");
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "log1.txt"]);
+
+    // Simulate an upload refresh in the same directory:
+    // New row "log2.txt" added to newly fetched table rows
+    const makeRow = (def) => {
+        const attrs = {};
+        if (def.isParent) attrs["data-parent"] = "1";
+        if (def.name !== undefined) attrs["data-name"] = def.name;
+        if (def.isDir) attrs["data-isdir"] = "1";
+        else if (!def.isParent) attrs["data-isdir"] = "0";
+        const el = {
+            getAttribute: (a) => attrs[a] || null,
+            setAttribute: (a, v) => { attrs[a] = String(v); },
+            style: {},
+        };
+        return el;
+    };
+    const newRows = [
+        makeRow({ isParent: true }),
+        makeRow({ name: "image.png", isDir: false }),
+        makeRow({ name: "log1.txt", isDir: false }),
+        makeRow({ name: "log2.txt", isDir: false }),
+    ];
+    env.tbody.children = newRows;
+
+    // Refresh re-applies sorting and filtering without clearing query
+    env.win.VortexSort.apply();
+    env.win.VortexSearch.apply();
+
+    // Query is preserved
+    assert.strictEqual(env.win.VortexSearch.getQuery(), "log");
+    // Visible rows include [..] and the two matching log files; image.png is hidden
+    assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "log1.txt", "log2.txt"]);
+});

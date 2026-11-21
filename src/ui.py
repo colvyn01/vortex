@@ -12,6 +12,7 @@ web UI for browsing and uploading files.
 
 import html
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import List
 from urllib.parse import quote, unquote
@@ -105,6 +106,23 @@ def format_size(size_bytes: int) -> str:
     return f"{size:.1f} {_SIZE_UNITS[-1]}"
 
 
+def _format_mtime(mtime: float) -> str:
+    """
+    Format a modification timestamp as a human-readable string.
+
+    Args:
+        mtime: Modification time as seconds since epoch.
+
+    Returns:
+        Formatted string like "2024-01-15 14:30".
+    """
+    try:
+        dt = datetime.fromtimestamp(mtime)
+        return dt.strftime("%Y-%m-%d %H:%M")
+    except (OSError, ValueError, OverflowError):
+        return ""
+
+
 # HTML Layout
 
 
@@ -181,7 +199,9 @@ def _build_file_table_rows(real_path: Path, base_directory: str) -> List[str]:
     Build HTML table rows for directory entries.
 
     Creates a table row for each file and subdirectory, including
-    a parent directory link ("..") when not at the root.
+    a parent directory link ("..") when not at the root. Rows carry
+    raw data attributes for client-side sorting and searching:
+    data-name, data-size, data-mtime, data-isdir, and data-parent.
 
     Args:
         real_path: Path to the directory being listed.
@@ -195,7 +215,11 @@ def _build_file_table_rows(real_path: Path, base_directory: str) -> List[str]:
     # Add parent directory link if not at root
     rel = os.path.relpath(real_path, base_directory)
     if rel != ".":
-        rows.append('<tr><td><a href="../">[..]</a></td><td></td></tr>')
+        rows.append(
+            '<tr data-parent="1">'
+            '<td><a href="../">[..]</a></td><td></td><td></td>'
+            "</tr>"
+        )
 
     # Sort entries case-insensitively
     try:
@@ -210,18 +234,44 @@ def _build_file_table_rows(real_path: Path, base_directory: str) -> List[str]:
             name = entry.name + ("/" if is_dir else "")
             escaped_name = html.escape(name)
             quoted_href = html.escape(quote(name, safe="/"))
+            escaped_raw_name = html.escape(entry.name, quote=True)
+
+            stat_ok = False
+            mtime_attr = ""
+            mtime_display = ""
+            try:
+                stat_info = entry.stat()
+                stat_ok = True
+                mtime_val = stat_info.st_mtime
+                mtime_attr = str(mtime_val)
+                mtime_display = _format_mtime(mtime_val)
+            except (OSError, PermissionError):
+                stat_ok = False
+                mtime_attr = ""
+                mtime_display = ""
 
             if is_dir:
-                size = "-"
+                size_attr = ""
+                size_display = "-"
+            elif stat_ok:
+                raw_size = stat_info.st_size
+                size_attr = str(raw_size)
+                size_display = format_size(raw_size)
             else:
-                try:
-                    size = format_size(entry.stat().st_size)
-                except (OSError, PermissionError):
-                    size = "?"  # Cannot stat file
+                size_attr = ""
+                size_display = "?"
+
+            is_dir_attr = "1" if is_dir else "0"
 
             rows.append(
-                f'<tr><td><a href="{quoted_href}">{escaped_name}</a></td>'
-                f"<td>{size}</td></tr>"
+                f'<tr data-name="{escaped_raw_name}"'
+                f' data-size="{size_attr}"'
+                f' data-mtime="{mtime_attr}"'
+                f' data-isdir="{is_dir_attr}">'
+                f'<td><a href="{quoted_href}">{escaped_name}</a></td>'
+                f"<td>{html.escape(mtime_display)}</td>"
+                f"<td>{size_display}</td>"
+                f"</tr>"
             )
         except (OSError, PermissionError):
             # Skip entries we cannot access
@@ -273,7 +323,25 @@ def render_directory_listing(
     # Build the file table HTML
     table_html = (
         "<table>"
-        "<thead><tr><th>Name</th><th>Size</th></tr></thead>"
+        "<thead>"
+        "<tr>"
+        '<th scope="col" class="col-name" aria-sort="ascending">'
+        '<button type="button" class="sort-header-btn" data-sort="name">'
+        '<span>Name</span><span class="sort-icon" aria-hidden="true">▲</span>'
+        "</button>"
+        "</th>"
+        '<th scope="col" class="col-mtime" aria-sort="none">'
+        '<button type="button" class="sort-header-btn" data-sort="mtime">'
+        '<span>Last modified</span><span class="sort-icon" aria-hidden="true"></span>'
+        "</button>"
+        "</th>"
+        '<th scope="col" class="col-size" aria-sort="none">'
+        '<button type="button" class="sort-header-btn" data-sort="size">'
+        '<span>Size</span><span class="sort-icon" aria-hidden="true"></span>'
+        "</button>"
+        "</th>"
+        "</tr>"
+        "</thead>"
         "<tbody>" + "".join(rows) + "</tbody></table>"
     )
 
@@ -281,8 +349,9 @@ def render_directory_listing(
     download_btn = ""
     if file_count > 0:
         download_btn = (
-            f'<a class="btn btn-download" href="?download=zip">'
-            f"Download All ({file_count})</a>"
+            f'<a class="btn btn-download" href="?download=zip"'
+            f' title="Downloads all {file_count} file(s) in this directory as a zip archive (entire directory)">'
+            f"Download Entire Directory ({file_count})</a>"
         )
 
     # Subheader shows current path and base directory
@@ -331,6 +400,10 @@ def render_directory_listing(
           <span>Files</span>
         </div>
         {download_btn}
+        <div class="file-search">
+          <input type="search" id="file-search-input" class="file-search-input" placeholder="Search files &amp; folders..." aria-label="Search files and folders" autocomplete="off" spellcheck="false">
+          <button type="button" id="file-search-clear" class="file-search-clear" aria-label="Clear search" title="Clear search" style="display: none;">×</button>
+        </div>
         <div class="file-list">
           {table_html}
         </div>
