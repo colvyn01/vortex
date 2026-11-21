@@ -874,6 +874,12 @@ document.addEventListener('DOMContentLoaded', function() {
 	var qrContainer = document.getElementById('qr-container');
 	var qrCode = document.getElementById('qr-code');
 	var qrUrlText = document.getElementById('qr-url-text');
+	var qrListenersAttached = false;
+	var qrRetryTimer = null;
+	var qrRetryAttempts = 0;
+	var MAX_QR_RETRIES = 50;
+	var qrRenderedTheme = null;
+	var qrRenderedUrl = null;
 
 	// Initialize Features
 	initializeChat();
@@ -1733,23 +1739,137 @@ document.addEventListener('DOMContentLoaded', function() {
 	}
 
 	/**
+	 * Check if the viewport is eligible for QR code display (desktop > 900px).
+	 * Aligned with CSS @media (max-width: 900px).
+	 */
+	function isQREligible() {
+		if (window.matchMedia) {
+			var m = window.matchMedia('(max-width: 900px)');
+			if (m && typeof m.matches === 'boolean') {
+				if (m.matches) return false;
+				if (typeof window.innerWidth === 'number' && window.innerWidth <= 900) {
+					return false;
+				}
+				return true;
+			}
+		}
+		return typeof window.innerWidth === 'number' ? window.innerWidth > 900 : false;
+	}
+
+	/**
+	 * Check if the document is visible (not minimized / hidden tab).
+	 */
+	function isQRVisible() {
+		if (typeof document.hidden !== 'undefined' && document.hidden) {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * Attach event listeners once to handle resize, unminimize/restore, and late library load.
+	 */
+	function attachQRListeners() {
+		if (qrListenersAttached) return;
+		qrListenersAttached = true;
+
+		window.addEventListener('resize', handleQRStateChange);
+		document.addEventListener('visibilitychange', handleQRStateChange);
+		window.addEventListener('pageshow', handleQRStateChange);
+		window.addEventListener('focus', handleQRStateChange);
+
+		if (window.matchMedia) {
+			var mql = window.matchMedia('(max-width: 900px)');
+			if (mql) {
+				if (typeof mql.addEventListener === 'function') {
+					mql.addEventListener('change', handleQRStateChange);
+				} else if (typeof mql.addListener === 'function') {
+					mql.addListener(handleQRStateChange);
+				}
+			}
+		}
+
+		var script = document.querySelector('script[src*="qrcode"]');
+		if (script && typeof script.addEventListener === 'function') {
+			script.addEventListener('load', handleQRStateChange);
+		}
+	}
+
+	function handleQRStateChange() {
+		renderQRCodeIfEligible();
+	}
+
+	/**
+	 * Render or update QR code and connection URL when eligible and visible.
+	 */
+	function renderQRCodeIfEligible() {
+		if (!qrContainer || !qrCode || !qrUrlText) return;
+
+		if (!isQREligible() || !isQRVisible()) {
+			if (qrRetryTimer) {
+				clearTimeout(qrRetryTimer);
+				qrRetryTimer = null;
+			}
+			return;
+		}
+
+		qrUrlText.textContent = window.location.href;
+
+		if (typeof QRCode === 'undefined') {
+			if (!qrRetryTimer && qrRetryAttempts < MAX_QR_RETRIES) {
+				qrRetryAttempts++;
+				qrRetryTimer = setTimeout(function() {
+					qrRetryTimer = null;
+					renderQRCodeIfEligible();
+				}, 100);
+			}
+			return;
+		}
+
+		if (qrRetryTimer) {
+			clearTimeout(qrRetryTimer);
+			qrRetryTimer = null;
+		}
+		qrRetryAttempts = 0;
+
+		var currentTheme = (root && root.getAttribute('data-theme')) ||
+			(document.documentElement && document.documentElement.getAttribute('data-theme')) || 'light';
+		var currentUrl = window.location.href;
+
+		if (qrRenderedTheme === currentTheme &&
+			qrRenderedUrl === currentUrl &&
+			qrCode.children && qrCode.children.length > 0) {
+			return;
+		}
+
+		generateQRCode();
+	}
+
+	/**
 	 * Generate QR code with theme-aware colors.
 	 */
 	function generateQRCode() {
 		if (!qrCode) return;
 		if (typeof QRCode === 'undefined') return;
 
+		if (!isQREligible() || !isQRVisible()) {
+			qrRenderedTheme = null;
+			return;
+		}
+
 		qrCode.innerHTML = '';
 		qrCode.title = '';
 
 		var currentUrl = window.location.href;
+		var currentTheme = (root && root.getAttribute('data-theme')) ||
+			(document.documentElement && document.documentElement.getAttribute('data-theme')) || 'light';
 
-		var style = getComputedStyle(document.documentElement);
-		var fgColor = style.getPropertyValue('--text-main').trim();
-		var bgColor = style.getPropertyValue('--surface-main').trim();
+		var style = (typeof window.getComputedStyle === 'function') ? window.getComputedStyle(document.documentElement) : null;
+		var fgColor = style ? style.getPropertyValue('--text-main').trim() : '';
+		var bgColor = style ? style.getPropertyValue('--surface-main').trim() : '';
 
-		if (!fgColor) fgColor = '#263238';
-		if (!bgColor) bgColor = '#ffffff';
+		if (!fgColor) fgColor = (currentTheme === 'dark') ? '#E0E0E0' : '#263238';
+		if (!bgColor) bgColor = (currentTheme === 'dark') ? '#1e252b' : '#ffffff';
 
 		new QRCode(qrCode, {
 			text: currentUrl,
@@ -1759,6 +1879,13 @@ document.addEventListener('DOMContentLoaded', function() {
 			colorLight: "transparent",
 			correctLevel: QRCode.CorrectLevel.M
 		});
+
+		if (qrUrlText) {
+			qrUrlText.textContent = currentUrl;
+		}
+
+		qrRenderedTheme = currentTheme;
+		qrRenderedUrl = currentUrl;
 	}
 
 	/**
@@ -1767,19 +1894,8 @@ document.addEventListener('DOMContentLoaded', function() {
 	function initializeQRCode() {
 		if (!qrContainer || !qrCode || !qrUrlText) return;
 
-		// Skip on mobile/tablet
-		if (window.innerWidth < 900) return;
-
-		// Wait for QRCode library to load
-		if (typeof QRCode === 'undefined') {
-			setTimeout(initializeQRCode, 100);
-			return;
-		}
-
-		generateQRCode();
-
-		// Display URL text
-		qrUrlText.textContent = window.location.href;
+		attachQRListeners();
+		renderQRCodeIfEligible();
 	}
 
 	/**

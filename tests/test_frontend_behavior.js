@@ -472,27 +472,57 @@ test("7. Popstate navigation does not call history.pushState", async () => {
 
 // --- Startup Sequence Regression Tests ---
 
-function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 } = {}) {
+class MockQRCode {
+    constructor(el, options) {
+        this.el = el;
+        this.options = options;
+        el.children = el.children || [];
+        el.children.push({
+            tagName: "CANVAS",
+            options,
+        });
+        MockQRCode.instances.push(this);
+    }
+}
+MockQRCode.instances = [];
+MockQRCode.CorrectLevel = { M: 0 };
+
+function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800, hidden = false, theme = "light" } = {}) {
     const docListeners = {};
     const winListeners = {};
     const elements = {};
 
     const makeElement = (props = {}) => {
         const elListeners = {};
-        return {
+        let _innerHTML = props.innerHTML || "";
+        let _children = props.children ? [...props.children] : [];
+        let _textContent = props.textContent !== undefined ? props.textContent : "";
+        const attrs = { ...(props.attrs || {}) };
+        const el = {
             addEventListener: (ev, fn) => {
                 elListeners[ev] = elListeners[ev] || [];
                 elListeners[ev].push(fn);
             },
+            get listeners() { return elListeners; },
             querySelector: (sel) => elements[sel] || null,
             querySelectorAll: () => [],
-            setAttribute: () => {},
-            getAttribute: () => null,
+            setAttribute: (k, v) => { attrs[k] = String(v); },
+            getAttribute: (k) => (attrs[k] !== undefined ? attrs[k] : null),
             closest: (sel) => null,
             classList: { add: () => {}, remove: () => {} },
             style: {},
+            get textContent() { return _textContent; },
+            set textContent(val) { _textContent = val; },
+            get children() { return _children; },
+            set children(val) { _children = val; },
+            get innerHTML() { return _innerHTML; },
+            set innerHTML(val) {
+                _innerHTML = val;
+                if (val === "") _children = [];
+            },
             ...props,
         };
+        return el;
     };
 
     const dirSizeLabel = makeElement({ textContent: "Calculating size..." });
@@ -516,7 +546,7 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
     elements[".device-main"] = makeElement();
     elements[".file-list"] = makeElement({ innerHTML: "files" });
     elements[".device-subheader"] = makeElement({ innerHTML: "subheader" });
-    elements["document-element"] = makeElement({ getAttribute: () => "light" });
+    elements["document-element"] = makeElement({ attrs: { "data-theme": theme } });
 
     const doc = {
         documentElement: elements["document-element"],
@@ -528,8 +558,10 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
             docListeners[ev].push(fn);
         },
         cookie: "",
+        hidden,
     };
 
+    const mqlListeners = [];
     const win = {
         location: { pathname, href: `http://localhost:8000${pathname}` },
         history: {
@@ -539,7 +571,34 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
             },
             replaceState: () => {},
         },
-        matchMedia: () => ({ matches: false }),
+        matchMedia: (query) => ({
+            get matches() {
+                if (query && query.includes("max-width: 900px")) {
+                    return win.innerWidth <= 900;
+                }
+                return false;
+            },
+            addEventListener: (ev, fn) => {
+                mqlListeners.push(fn);
+            },
+            removeEventListener: () => {},
+            addListener: (fn) => {
+                mqlListeners.push(fn);
+            },
+            removeListener: () => {},
+        }),
+        getComputedStyle: () => ({
+            getPropertyValue: (prop) => {
+                const currentTheme = elements["document-element"].getAttribute("data-theme") || theme;
+                if (prop === "--text-main") {
+                    return currentTheme === "dark" ? "#E0E0E0" : "#263238";
+                }
+                if (prop === "--surface-main") {
+                    return currentTheme === "dark" ? "#1e252b" : "#ffffff";
+                }
+                return "";
+            },
+        }),
         addEventListener: (ev, fn) => {
             winListeners[ev] = winListeners[ev] || [];
             winListeners[ev].push(fn);
@@ -548,7 +607,7 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
     };
 
     const storage = {
-        getItem: () => null,
+        getItem: (k) => (k === "theme" ? theme : null),
         setItem: () => {},
     };
 
@@ -575,6 +634,23 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
         }
     };
 
+    const triggerWinEvent = (ev) => {
+        for (const fn of (winListeners[ev] || [])) {
+            fn();
+        }
+        if (ev === "resize") {
+            for (const fn of mqlListeners) {
+                fn();
+            }
+        }
+    };
+
+    const triggerDocEvent = (ev) => {
+        for (const fn of (docListeners[ev] || [])) {
+            fn();
+        }
+    };
+
     return {
         doc,
         win,
@@ -584,6 +660,8 @@ function createStartupEnvironment({ pathname = "/", mockFetch, innerWidth = 800 
         listeners: docListeners,
         winListeners,
         triggerDOMContentLoaded,
+        triggerWinEvent,
+        triggerDocEvent,
     };
 }
 
@@ -1503,4 +1581,195 @@ test("28. Search: Upload refresh within same directory preserves search query an
     assert.strictEqual(env.win.VortexSearch.getQuery(), "log");
     // Visible rows include [..] and the two matching log files; image.png is hidden
     assert.deepStrictEqual(env.getVisibleRowNames(), ["[..]", "log1.txt", "log2.txt"]);
+});
+
+// --- QR Code Initialization and Responsive Regression Tests ---
+
+test("29. QR code: Initial wide-window loading generates QR and sets URL", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        const env = createStartupEnvironment({ pathname: "/folder/", innerWidth: 1200 });
+        env.triggerDOMContentLoaded();
+
+        const qrText = env.elements["qr-url-text"];
+        const qrEl = env.elements["qr-code"];
+
+        assert.strictEqual(qrText.textContent, "http://localhost:8000/folder/");
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.text, "http://localhost:8000/folder/");
+        assert.strictEqual(qrEl.children[0].options.colorDark, "#263238");
+    } finally {
+        delete global.QRCode;
+    }
+});
+
+test("30. QR code: Initial narrow loading followed by widening initializes QR code", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        const env = createStartupEnvironment({ pathname: "/", innerWidth: 800 });
+        env.triggerDOMContentLoaded();
+
+        const qrText = env.elements["qr-url-text"];
+        const qrEl = env.elements["qr-code"];
+
+        // Must be uninitialized when narrow
+        assert.strictEqual(qrText.textContent, "");
+        assert.strictEqual(qrEl.children.length, 0);
+
+        // Window widens to desktop
+        env.win.innerWidth = 1024;
+        env.triggerWinEvent("resize");
+
+        assert.strictEqual(qrText.textContent, "http://localhost:8000/");
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.text, "http://localhost:8000/");
+    } finally {
+        delete global.QRCode;
+    }
+});
+
+test("31. QR code: Responsive breakpoint boundary behavior (900px mobile vs 901px desktop)", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        // Startup exactly at 900px (mobile boundary)
+        const env = createStartupEnvironment({ pathname: "/", innerWidth: 900 });
+        env.triggerDOMContentLoaded();
+
+        const qrText = env.elements["qr-url-text"];
+        const qrEl = env.elements["qr-code"];
+
+        assert.strictEqual(qrText.textContent, "");
+        assert.strictEqual(qrEl.children.length, 0);
+
+        // Resize below boundary: 899px
+        env.win.innerWidth = 899;
+        env.triggerWinEvent("resize");
+        assert.strictEqual(qrText.textContent, "");
+        assert.strictEqual(qrEl.children.length, 0);
+
+        // Resize back to 900px
+        env.win.innerWidth = 900;
+        env.triggerWinEvent("resize");
+        assert.strictEqual(qrText.textContent, "");
+        assert.strictEqual(qrEl.children.length, 0);
+
+        // Cross boundary to 901px (desktop)
+        env.win.innerWidth = 901;
+        env.triggerWinEvent("resize");
+        assert.strictEqual(qrText.textContent, "http://localhost:8000/");
+        assert.strictEqual(qrEl.children.length, 1);
+    } finally {
+        delete global.QRCode;
+    }
+});
+
+test("32. QR code: Repeated narrow/wide transitions are idempotent without duplicate QR output", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        const env = createStartupEnvironment({ pathname: "/", innerWidth: 1200 });
+        env.triggerDOMContentLoaded();
+
+        const qrEl = env.elements["qr-code"];
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(MockQRCode.instances.length, 1);
+
+        // Resize repeatedly between narrow and wide
+        const widths = [800, 1200, 750, 1050, 600, 1400];
+        for (const w of widths) {
+            env.win.innerWidth = w;
+            env.triggerWinEvent("resize");
+            if (w > 900) {
+                // Must keep single QR output without duplicate canvas elements or extra instances
+                assert.strictEqual(qrEl.children.length, 1);
+                assert.strictEqual(MockQRCode.instances.length, 1);
+            }
+        }
+    } finally {
+        delete global.QRCode;
+    }
+});
+
+test("33. QR code: Hidden/minimized startup followed by restore initializes QR code", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        const env = createStartupEnvironment({ pathname: "/restore-test/", innerWidth: 1200, hidden: true });
+        env.triggerDOMContentLoaded();
+
+        const qrText = env.elements["qr-url-text"];
+        const qrEl = env.elements["qr-code"];
+
+        // Startup while hidden: skipped
+        assert.strictEqual(qrText.textContent, "");
+        assert.strictEqual(qrEl.children.length, 0);
+
+        // Document restored/visible
+        env.doc.hidden = false;
+        env.triggerDocEvent("visibilitychange");
+
+        assert.strictEqual(qrText.textContent, "http://localhost:8000/restore-test/");
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.text, "http://localhost:8000/restore-test/");
+    } finally {
+        delete global.QRCode;
+    }
+});
+
+test("34. QR code: Delayed library availability renders QR when ready without refresh or indefinite polling", async () => {
+    MockQRCode.instances = [];
+    delete global.QRCode;
+
+    const env = createStartupEnvironment({ pathname: "/delayed/", innerWidth: 1200 });
+    env.triggerDOMContentLoaded();
+
+    const qrText = env.elements["qr-url-text"];
+    const qrEl = env.elements["qr-code"];
+
+    // URL is shown immediately even if QR library is delayed
+    assert.strictEqual(qrText.textContent, "http://localhost:8000/delayed/");
+    assert.strictEqual(qrEl.children.length, 0);
+
+    // Simulate library loaded later
+    global.QRCode = MockQRCode;
+
+    // Wait for the retry loop to pick up the ready library
+    await new Promise((r) => setTimeout(r, 250));
+
+    assert.strictEqual(qrEl.children.length, 1);
+    assert.strictEqual(qrEl.children[0].options.text, "http://localhost:8000/delayed/");
+    delete global.QRCode;
+});
+
+test("35. QR code: Theme switching after becoming visible updates QR colors", () => {
+    MockQRCode.instances = [];
+    global.QRCode = MockQRCode;
+    try {
+        const env = createStartupEnvironment({ pathname: "/", innerWidth: 1200, theme: "light" });
+        env.triggerDOMContentLoaded();
+
+        const qrEl = env.elements["qr-code"];
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.colorDark, "#263238");
+
+        // Click theme toggle to switch to dark
+        const toggleBtn = env.elements["theme-toggle"];
+        const clickFn = toggleBtn.listeners["click"][0];
+        clickFn();
+
+        assert.strictEqual(env.elements["document-element"].getAttribute("data-theme"), "dark");
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.colorDark, "#E0E0E0");
+
+        // Click theme toggle to switch back to light
+        clickFn();
+        assert.strictEqual(env.elements["document-element"].getAttribute("data-theme"), "light");
+        assert.strictEqual(qrEl.children.length, 1);
+        assert.strictEqual(qrEl.children[0].options.colorDark, "#263238");
+    } finally {
+        delete global.QRCode;
+    }
 });
