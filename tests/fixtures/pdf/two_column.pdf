@@ -1,0 +1,71 @@
+%PDF-1.4
+%\xe2\xe3\xcf\xd3
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 772 >>
+stream
+BT
+/F1 12 Tf
+/F1 16 Tf
+1 0 0 1 50 730 Tm
+(Two Column Analysis and Technical Demonstration) Tj
+/F1 11 Tf
+1 0 0 1 50 680 Tm
+(Column one line one text.) Tj
+/F1 11 Tf
+1 0 0 1 50 664 Tm
+(Column one line two text.) Tj
+/F1 11 Tf
+1 0 0 1 50 648 Tm
+(Column one line three text.) Tj
+/F1 11 Tf
+1 0 0 1 50 632 Tm
+(Column one line four text.) Tj
+/F1 11 Tf
+1 0 0 1 50 616 Tm
+(Column one line five text.) Tj
+/F1 11 Tf
+1 0 0 1 340 680 Tm
+(Column two line one text.) Tj
+/F1 11 Tf
+1 0 0 1 340 664 Tm
+(Column two line two text.) Tj
+/F1 11 Tf
+1 0 0 1 340 648 Tm
+(Column two line three text.) Tj
+/F1 11 Tf
+1 0 0 1 340 632 Tm
+(Column two line four text.) Tj
+/F1 11 Tf
+1 0 0 1 340 616 Tm
+(Column two line five text.) Tj
+/F1 10 Tf
+1 0 0 1 50 50 Tm
+(Page 1 Footer Information across columns) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000027 00000 n 
+0000000076 00000 n 
+0000000133 00000 n 
+0000000259 00000 n 
+0000001082 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1179
+%%EOF
