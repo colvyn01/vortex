@@ -14,7 +14,7 @@ import html
 import os
 from pathlib import Path
 from typing import List
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from .scripts import JS_UPLOAD_HANDLER
 from .styles import CSS_STYLESHEET
@@ -209,6 +209,7 @@ def _build_file_table_rows(real_path: Path, base_directory: str) -> List[str]:
             is_dir = entry.is_dir()
             name = entry.name + ("/" if is_dir else "")
             escaped_name = html.escape(name)
+            quoted_href = html.escape(quote(name, safe="/"))
 
             if is_dir:
                 size = "-"
@@ -219,7 +220,7 @@ def _build_file_table_rows(real_path: Path, base_directory: str) -> List[str]:
                     size = "?"  # Cannot stat file
 
             rows.append(
-                f'<tr><td><a href="{escaped_name}">{escaped_name}</a></td>'
+                f'<tr><td><a href="{quoted_href}">{escaped_name}</a></td>'
                 f"<td>{size}</td></tr>"
             )
         except (OSError, PermissionError):

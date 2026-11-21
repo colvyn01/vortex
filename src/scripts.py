@@ -541,12 +541,15 @@ document.addEventListener('DOMContentLoaded', function() {
 	var isKicked = false;
 	var isHost = false;
 
+	// Directory Size and Navigation State
+	var currentSizeRequestId = 0;
+	var currentNavId = 0;
+
 	// UI Elements
 	var chatMessages = document.getElementById('chat-messages');
 	var chatForm = document.getElementById('chat-form');
 	var chatInput = document.getElementById('chat-input');
 	var chatStatus = document.getElementById('chat-status');
-	var dirSizeInfo = document.getElementById('dir-size-info');
 	var qrContainer = document.getElementById('qr-container');
 	var qrCode = document.getElementById('qr-code');
 	var qrUrlText = document.getElementById('qr-url-text');
@@ -1258,54 +1261,7 @@ document.addEventListener('DOMContentLoaded', function() {
 	 * Navigate to upload directory and refresh file list.
 	 */
 	function navigateToUploadDirectory(path) {
-		// Update browser URL without full reload
-		window.history.pushState({}, '', path);
-
-		var fileList = document.querySelector('.file-list');
-		if (!fileList) {
-			window.location.href = path;
-			return;
-		}
-
-		fileList.classList.add('updating');
-
-		fetch(path, {
-			headers: {
-				'X-Requested-With': 'XMLHttpRequest'
-			}
-		})
-			.then(function(response) {
-				if (!response.ok) throw new Error('Navigation failed');
-				return response.text();
-			})
-			.then(function(html) {
-				var parser = new DOMParser();
-				var doc = parser.parseFromString(html, 'text/html');
-
-				// Update file listing
-				var newFileList = doc.querySelector('.file-list');
-				var currentFileList = document.querySelector('.file-list');
-				if (newFileList && currentFileList) {
-					currentFileList.innerHTML = newFileList.innerHTML;
-					currentFileList.classList.remove('updating');
-				}
-
-				// Update path display
-				var newSubheader = doc.querySelector('.device-subheader');
-				var currentSubheader = document.querySelector('.device-subheader');
-				if (newSubheader && currentSubheader) {
-					currentSubheader.innerHTML = newSubheader.innerHTML;
-				}
-
-				// Refresh directory size
-				if (typeof fetchDirectorySize === 'function') {
-					fetchDirectorySize();
-				}
-			})
-			.catch(function(error) {
-				console.error('Navigation failed:', error);
-				window.location.href = path;
-			});
+		navigateToDirectory(path);
 	}
 
 	/**
@@ -1496,26 +1452,155 @@ document.addEventListener('DOMContentLoaded', function() {
 	/**
 	 * Fetch directory size information.
 	 */
-	function fetchDirectorySize() {
-		if (!dirSizeInfo) return;
+	function fetchDirectorySize(targetPath) {
+		var path = (targetPath ? new URL(targetPath, window.location.href).pathname : window.location.pathname) || '/';
+		var label = document.getElementById('dir-size-info');
+		if (!label) return;
 
-		fetch('/api/directory-size?session=' + encodeURIComponent(sessionId), {
+		var reqId = ++currentSizeRequestId;
+
+		return fetch('/api/directory-size?session=' + encodeURIComponent(sessionId) + '&path=' + encodeURIComponent(path), {
 			headers: {
 				'X-Device-ID': DEVICE_ID
 			}
 		})
 			.then(function(response) {
-				if (!response.ok) throw new Error('Fetch failed');
+				if (!response.ok) throw new Error('Fetch failed: ' + response.status);
 				return response.json();
 			})
 			.then(function(data) {
-				if (data.size) {
-					dirSizeInfo.textContent = 'Total: ' + data.size.total_formatted +
+				var currentLabel = document.getElementById('dir-size-info');
+				if (reqId !== currentSizeRequestId ||
+					window.location.pathname !== path ||
+					!currentLabel ||
+					currentLabel !== label) {
+					return;
+				}
+
+				if (data && data.size && typeof data.size.total_formatted === 'string') {
+					currentLabel.textContent = 'Total: ' + data.size.total_formatted +
 						' (' + data.size.file_count + ' files)';
+				} else {
+					currentLabel.textContent = 'Size unavailable';
 				}
 			})
 			.catch(function(error) {
-				dirSizeInfo.textContent = 'Size unavailable';
+				var currentLabel = document.getElementById('dir-size-info');
+				if (reqId !== currentSizeRequestId ||
+					window.location.pathname !== path ||
+					!currentLabel ||
+					currentLabel !== label) {
+					return;
+				}
+				currentLabel.textContent = 'Size unavailable';
+			});
+	}
+
+	/**
+	 * Navigate to a directory without full page reload.
+	 */
+	function navigateToDirectory(path, pushHistory) {
+		var targetUrl = new URL(path, window.location.href);
+		var resolvedPath = targetUrl.pathname;
+
+		var fileList = document.querySelector('.file-list');
+		if (!fileList) {
+			// Fallback to full page load if file list not found
+			window.location.href = resolvedPath;
+			return;
+		}
+
+		var navId = ++currentNavId;
+
+		// Add loading state
+		fileList.classList.add('updating');
+
+		fetch(resolvedPath, {
+			headers: {
+				'X-Requested-With': 'XMLHttpRequest'
+			}
+		})
+			.then(function(response) {
+				if (!response.ok) throw new Error('Navigation failed: ' + response.status);
+				return response.text();
+			})
+			.then(function(html) {
+				if (navId !== currentNavId) return;
+
+				var parser = new DOMParser();
+				var doc = parser.parseFromString(html, 'text/html');
+
+				// Update file listing
+				var newFileList = doc.querySelector('.file-list');
+				var currentFileList = document.querySelector('.file-list');
+				if (newFileList && currentFileList) {
+					currentFileList.innerHTML = newFileList.innerHTML;
+					currentFileList.classList.remove('updating');
+				}
+
+				// Update path display
+				var newSubheader = doc.querySelector('.device-subheader');
+				var currentSubheader = document.querySelector('.device-subheader');
+				if (newSubheader && currentSubheader) {
+					currentSubheader.innerHTML = newSubheader.innerHTML;
+				}
+
+				// Update session data (for chat context)
+				var newSessionData = doc.querySelector('#session-data');
+				var currentSessionData = document.querySelector('#session-data');
+				if (newSessionData && currentSessionData) {
+					currentSessionData.dataset.baseDir = newSessionData.dataset.baseDir;
+				}
+
+				// Update page title
+				var newTitle = doc.querySelector('title');
+				if (newTitle) {
+					document.title = newTitle.textContent;
+				}
+
+				// Update URL without reload if not from popstate
+				if (pushHistory !== false) {
+					window.history.pushState({ path: resolvedPath }, '', resolvedPath);
+				}
+
+				// Update Download All button href if present
+				var downloadBtn = document.querySelector('.btn-download');
+				var newDownloadBtn = doc.querySelector('.btn-download');
+				if (downloadBtn && newDownloadBtn) {
+					downloadBtn.href = newDownloadBtn.href;
+					downloadBtn.textContent = newDownloadBtn.textContent;
+					downloadBtn.style.display = '';
+				} else if (downloadBtn && !newDownloadBtn) {
+					downloadBtn.style.display = 'none';
+				} else if (!downloadBtn && newDownloadBtn) {
+					// Insert Download All button if it appeared
+					var panel = document.querySelector('.panel-files');
+					if (panel) {
+						var panelTitle = panel.querySelector('.panel-title');
+						if (panelTitle && panelTitle.nextSibling) {
+							panel.insertBefore(newDownloadBtn, panelTitle.nextSibling);
+						}
+					}
+				}
+
+				// Update upload form action to current path
+				var uploadForm = document.querySelector('.panel-upload form');
+				if (uploadForm) {
+					uploadForm.action = resolvedPath;
+				}
+
+				// Refresh directory size
+				fetchDirectorySize(resolvedPath);
+
+				// Audio player remains untouched - no DOM manipulation
+				// Mini-player continues playing seamlessly
+			})
+			.catch(function(error) {
+				if (navId !== currentNavId) return;
+				console.error('Directory navigation failed:', error);
+				fileList.classList.remove('updating');
+				// Fallback to full page load
+				window.location.href = resolvedPath;
 			});
 	}
 
@@ -1619,109 +1704,10 @@ document.addEventListener('DOMContentLoaded', function() {
 			navigateToDirectory(href);
 		});
 
-		/**
-		 * Navigate to a directory without full page reload.
-		 */
-		function navigateToDirectory(path) {
-			var fileList = document.querySelector('.file-list');
-			if (!fileList) {
-				// Fallback to full page load if file list not found
-				window.location.href = path;
-				return;
-			}
-
-			// Add loading state
-			fileList.classList.add('updating');
-
-			fetch(path, {
-				headers: {
-					'X-Requested-With': 'XMLHttpRequest'
-				}
-			})
-				.then(function(response) {
-					if (!response.ok) throw new Error('Navigation failed');
-					return response.text();
-				})
-				.then(function(html) {
-					var parser = new DOMParser();
-					var doc = parser.parseFromString(html, 'text/html');
-
-					// Update file listing
-					var newFileList = doc.querySelector('.file-list');
-					var currentFileList = document.querySelector('.file-list');
-					if (newFileList && currentFileList) {
-						currentFileList.innerHTML = newFileList.innerHTML;
-						currentFileList.classList.remove('updating');
-					}
-
-					// Update path display
-					var newSubheader = doc.querySelector('.device-subheader');
-					var currentSubheader = document.querySelector('.device-subheader');
-					if (newSubheader && currentSubheader) {
-						currentSubheader.innerHTML = newSubheader.innerHTML;
-					}
-
-					// Update session data (for chat context)
-					var newSessionData = doc.querySelector('#session-data');
-					var currentSessionData = document.querySelector('#session-data');
-					if (newSessionData && currentSessionData) {
-						currentSessionData.dataset.baseDir = newSessionData.dataset.baseDir;
-					}
-
-					// Update page title
-					var newTitle = doc.querySelector('title');
-					if (newTitle) {
-						document.title = newTitle.textContent;
-					}
-
-					// Update URL without reload
-					window.history.pushState({ path: path }, '', path);
-
-					// Update Download All button href if present
-					var downloadBtn = document.querySelector('.btn-download');
-					var newDownloadBtn = doc.querySelector('.btn-download');
-					if (downloadBtn && newDownloadBtn) {
-						downloadBtn.href = newDownloadBtn.href;
-					} else if (downloadBtn && !newDownloadBtn) {
-						downloadBtn.style.display = 'none';
-					} else if (!downloadBtn && newDownloadBtn) {
-						// Insert Download All button if it appeared
-						var panel = document.querySelector('.panel-files');
-						if (panel) {
-							var panelTitle = panel.querySelector('.panel-title');
-							if (panelTitle && panelTitle.nextSibling) {
-								panel.insertBefore(newDownloadBtn, panelTitle.nextSibling);
-							}
-						}
-					}
-
-					// Update upload form action to current path
-					var uploadForm = document.querySelector('.panel-upload form');
-					if (uploadForm) {
-						uploadForm.action = path;
-					}
-
-					// Refresh directory size
-					fetchDirectorySize();
-
-					// Audio player remains untouched - no DOM manipulation
-					// Mini-player continues playing seamlessly
-				})
-				.catch(function(error) {
-					console.error('Directory navigation failed:', error);
-					fileList.classList.remove('updating');
-					// Fallback to full page load
-					window.location.href = path;
-				});
-		}
-
 		// Handle browser back/forward buttons
 		window.addEventListener('popstate', function(e) {
-			if (e.state && e.state.path) {
-				navigateToDirectory(e.state.path);
-			} else {
-				window.location.reload();
-			}
+			var targetPath = (e.state && e.state.path) || window.location.pathname;
+			navigateToDirectory(targetPath, false);
 		});
 
 		// Set initial state for back button

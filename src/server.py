@@ -1059,7 +1059,30 @@ class VortexHandler(SimpleHTTPRequestHandler):
             self._send_json({"error": "Missing session parameter"}, 400)
             return
 
-        size_info = _calculate_directory_size(self.base_directory)
+        # Accept directory URL path, defaulting to "/" for older clients
+        raw_path = query_params.get("path", query_params.get("dir", ["/"]))[0] or "/"
+
+        # Parse URL to get clean path, ensuring leading slash
+        parsed_url = urlparse(raw_path)
+        url_path = parsed_url.path or "/"
+        if not url_path.startswith("/"):
+            url_path = "/" + url_path
+
+        # Translate to filesystem path using application's safe mapping
+        target_path = self.translate_path(url_path)
+
+        # Security: Validate path is safely within base directory (rejects symlink and traversal escapes)
+        if not self._is_request_path_safe(target_path):
+            self._send_json({"error": "Access denied"}, 403)
+            return
+
+        # Validate that the target exists and is a directory
+        if not os.path.isdir(target_path):
+            self._send_json({"error": "Directory not found"}, 404)
+            return
+
+        canonical_path = str(Path(target_path).resolve())
+        size_info = _calculate_directory_size(canonical_path)
         self._send_json({"size": size_info, "cached_at": time.time()})
 
     def _handle_api_host_status(self) -> None:
