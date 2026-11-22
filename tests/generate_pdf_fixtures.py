@@ -194,7 +194,35 @@ def generate_all_fixtures(output_dir: Path):
         "S\n"
     )
     (output_dir / "scanned_textless.pdf").write_bytes(create_pdf([graphics_stream]))
-    print(f"Generated 6 PDF fixtures in {output_dir}")
+
+    # 7. Résumé fixture: Section headings, horizontal rules, right-aligned dates,
+    # bulleted multi-line paragraphs with hanging indentation, and mixed styles
+    resume_stream = (
+        # Section Heading: EXPERIENCE
+        "BT /F1 14 Tf 1 0 0 1 50 720 Tm (PROFESSIONAL EXPERIENCE) Tj ET\n"
+        # Horizontal rule under heading
+        "0.75 w 50 712 m 550 712 l S\n"
+        # Job Title (left) and Date (right)
+        "BT /F1 11 Tf 1 0 0 1 50 695 Tm (Staff Software Engineer - Core Infrastructure) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 470 695 Tm (2021 - Present) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 50 680 Tm (Vortex Systems Inc.) Tj ET\n"
+        # Bullet 1 (Symbol at x=50, multi-line paragraph at x=65 with hanging indent)
+        "BT /F1 10 Tf 1 0 0 1 50 660 Tm (\\225) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 65 660 Tm (Architected distributed synchronization engine handling 50k+ files across) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 65 646 Tm (heterogeneous desktop and mobile platforms with bounded memory footprint.) Tj ET\n"
+        # Bullet 2
+        "BT /F1 10 Tf 1 0 0 1 50 626 Tm (\\225) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 65 626 Tm (Spearheaded Linux kernel and Wayland compositor integration improvements) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 65 612 Tm (eliminating visual artifacts and improving overall UI frame rates by 40%.) Tj ET\n"
+        # Section Heading: EDUCATION
+        "BT /F1 14 Tf 1 0 0 1 50 580 Tm (EDUCATION) Tj ET\n"
+        "0.75 w 50 572 m 550 572 l S\n"
+        "BT /F1 11 Tf 1 0 0 1 50 555 Tm (B.S. in Computer Science and Engineering) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 470 555 Tm (2017 - 2021) Tj ET\n"
+        "BT /F1 10 Tf 1 0 0 1 50 540 Tm (Institute of Technology) Tj ET\n"
+    )
+    (output_dir / "resume.pdf").write_bytes(create_pdf([resume_stream]))
+    print(f"Generated 7 PDF fixtures in {output_dir}")
 
 if __name__ == '__main__':
     generate_all_fixtures(Path('/home/colvyn/Documents/Projects/vortex/tests/fixtures/pdf'))

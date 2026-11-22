@@ -1823,6 +1823,14 @@ def get_pdf_viewer_html() -> str:
       </svg>
       <span>Copy without line breaks</span>
     </button>
+    <button id="pdf-diag-btn" class="pdf-menu-item" role="menuitem" tabindex="0">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+      </svg>
+      <span>Export Diag</span>
+      <span class="pdf-menu-shortcut">Ctrl+Shift+D</span>
+    </button>
   </div>
 
   <!-- Manual Copy Fallback Dialog (for HTTP origins or clipboard permission denial) -->
@@ -2132,8 +2140,8 @@ def get_pdf_viewer_css() -> str:
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
   margin: 0 auto;
   transform-origin: center top;
-  user-select: text;
-  -webkit-user-select: text;
+  user-select: none;
+  -webkit-user-select: none;
   transition: transform 0.1s ease-out;
 }
 
@@ -2161,8 +2169,8 @@ def get_pdf_viewer_css() -> str:
   forced-color-adjust: none;
   transform-origin: 0 0;
   z-index: 2;
-  user-select: text;
-  -webkit-user-select: text;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .textLayer :is(span, br) {
@@ -2173,14 +2181,82 @@ def get_pdf_viewer_css() -> str:
   transform-origin: 0% 0%;
 }
 
-/* Okular-inspired selection style: crisp, compact blue highlight */
+.textLayer span {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Text layer selection: default transparent for container and structural helpers */
+.textLayer::selection {
+  background: transparent;
+}
+.textLayer::-moz-selection {
+  background: transparent;
+}
+
 .textLayer ::selection {
+  background: transparent;
+}
+.textLayer ::-moz-selection {
+  background: transparent;
+}
+
+/* Okular-inspired selection style: crisp, compact blue highlight strictly on selectable text spans */
+.textLayer span::selection {
   background: rgba(61, 174, 233, 0.42);
   color: transparent;
 }
-.textLayer ::-moz-selection {
+.textLayer span::-moz-selection {
   background: rgba(61, 174, 233, 0.42);
   color: transparent;
+}
+
+/* Marked-content structural tags have no dimensions and must not show selection highlights */
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+.textLayer span.markedContent::selection {
+  background: transparent;
+}
+.textLayer span.markedContent::-moz-selection {
+  background: transparent;
+}
+
+/* Line breaks (br) are structural elements with transparent selection highlight to prevent margin artifacts while retaining clipboard line breaks */
+.textLayer br {
+  pointer-events: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.textLayer br::selection {
+  background: transparent;
+}
+.textLayer br::-moz-selection {
+  background: transparent;
+}
+
+/* Sentinel elements below text content must never trigger visual selection */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: -1;
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.textLayer .endOfContent::selection {
+  background: transparent;
+}
+.textLayer .endOfContent::-moz-selection {
+  background: transparent;
+}
+
+/* Active drag selection: endOfContent expands to top:0 covering entire layer to prevent erratic whitespace jumping */
+.pdf-viewport.selecting .textLayer .endOfContent,
+.textLayer.selecting .endOfContent {
+  top: 0;
 }
 
 /* Temporary Space-Drag Panning */
@@ -2594,6 +2670,12 @@ def get_pdf_viewer_js() -> str:
     lastPointerPosition: null, // { x, y }
     autoScrollRAF: null,
     autoScrollSpeed: 0,
+    isSelecting: false,
+    cachedViewportRect: null,
+    dragTraceEnabled: false,
+    dragTraceBuffer: [],
+    dragEventSeq: 0,
+    lastDragEventTime: 0,
 
     // Temporary Panning
     isSpacePressed: false,
@@ -2622,6 +2704,7 @@ def get_pdf_viewer_js() -> str:
   };
 
   // DOM Elements
+  var BUILD_ID = 'vortex-pdf-20261121.diag7';
   var modal, backdrop, viewport, pagesContainer;
   var loading, loadingText;
   var filenameEl, liveIndicatorContainer, liveIndicator, liveToggle, downloadBtn, closeBtn;
@@ -2629,7 +2712,7 @@ def get_pdf_viewer_js() -> str:
   var zoomInBtn, zoomOutBtn, zoomLevelEl;
   var fitToggleBtn, iconFitWidth, iconFitPage;
   var rectSelectBtn, noTextBanner;
-  var selectionMenu, copyBtn, copyNoLineBreaksBtn;
+  var selectionMenu, copyBtn, copyNoLineBreaksBtn, diagBtn;
   var copyDialog, copyDialogTextarea, copyDialogClose, copyDialogDone;
   var toastEl, handleStart, handleEnd;
 
@@ -2640,6 +2723,8 @@ def get_pdf_viewer_js() -> str:
   function initPdfViewer() {
     modal = document.getElementById('pdf-viewer-modal');
     if (!modal) return;
+    modal.setAttribute('data-viewer-build', BUILD_ID);
+    console.log('[VortexPdfViewer ' + BUILD_ID + '] initialized');
 
     backdrop = modal.querySelector('.pdf-viewer-backdrop');
     viewport = document.getElementById('pdf-viewport');
@@ -2673,6 +2758,7 @@ def get_pdf_viewer_js() -> str:
     selectionMenu = document.getElementById('pdf-selection-menu');
     copyBtn = document.getElementById('pdf-copy-btn');
     copyNoLineBreaksBtn = document.getElementById('pdf-copy-nolinebreaks-btn');
+    diagBtn = document.getElementById('pdf-diag-btn');
 
     copyDialog = document.getElementById('pdf-copy-dialog');
     copyDialogTextarea = document.getElementById('pdf-copy-dialog-textarea');
@@ -2710,6 +2796,14 @@ def get_pdf_viewer_js() -> str:
       copyNoLineBreaksBtn.addEventListener('click', function(e) {
         e.preventDefault();
         copySelection(true);
+      });
+    }
+
+    if (diagBtn) {
+      diagBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        exportSelectionDiagnostic();
       });
     }
 
@@ -2763,6 +2857,7 @@ def get_pdf_viewer_js() -> str:
     modal.addEventListener('click', resetHudTimer);
 
     window.VortexPdfViewer = {
+      buildId: BUILD_ID,
       open: open,
       close: close,
       toggleRectSelect: toggleRectSelect,
@@ -2770,8 +2865,25 @@ def get_pdf_viewer_js() -> str:
       processReadingOrder: processReadingOrder,
       normalizeCopyText: normalizeCopyText,
       getDiagnostics: getDiagnostics,
-      updateVirtualization: updateVirtualization
+      updateVirtualization: updateVirtualization,
+      captureSelectionDiagnostic: captureSelectionDiagnostic,
+      exportSelectionDiagnostic: exportSelectionDiagnostic,
+      getSelectionDiagnostic: captureSelectionDiagnostic,
+      enableDragTrace: function(enable) {
+        state.dragTraceEnabled = !!enable;
+        if (!state.dragTraceEnabled) {
+          state.dragTraceBuffer = [];
+        }
+        return state.dragTraceEnabled;
+      },
+      getDragTrace: function() {
+        return state.dragTraceBuffer ? state.dragTraceBuffer.slice() : [];
+      },
+      isDragTraceEnabled: function() {
+        return !!state.dragTraceEnabled;
+      }
     };
+    window.capturePdfSelectionDiagnostic = exportSelectionDiagnostic;
   }
 
   /* --- Helper: Check if element is an editable control --- */
@@ -3120,6 +3232,7 @@ def get_pdf_viewer_js() -> str:
     }
 
     return {
+      buildId: BUILD_ID,
       activeRenderJobs: state.activeRenders,
       queuedRenderJobs: state.renderQueue.length,
       retainedCanvases: state.diagRetainedCanvases,
@@ -3144,7 +3257,468 @@ def get_pdf_viewer_js() -> str:
     };
   }
 
+  /* --- Selection Diagnostic & Layout Introspection --- */
+
+  function describeNode(node) {
+    if (!node) return null;
+    var desc = {
+      nodeType: node.nodeType,
+      nodeName: node.nodeName
+    };
+    if (node.nodeType === 1) {
+      desc.tagName = node.tagName;
+      desc.className = node.className || '';
+      desc.id = node.id || null;
+      desc.role = node.getAttribute ? node.getAttribute('role') : null;
+      desc.parentTagName = node.parentElement ? node.parentElement.tagName : null;
+      desc.parentClassName = node.parentElement ? (node.parentElement.className || '') : null;
+    } else if (node.nodeType === 3) {
+      desc.length = node.textContent ? node.textContent.length : 0;
+      desc.parentTagName = node.parentElement ? node.parentElement.tagName : null;
+      desc.parentClassName = node.parentElement ? (node.parentElement.className || '') : null;
+      if (node.parentElement && node.parentElement.parentElement) {
+        desc.grandparentTagName = node.parentElement.parentElement.tagName;
+        desc.grandparentClassName = node.parentElement.parentElement.className || '';
+      }
+    }
+    return desc;
+  }
+
+  function rectToObj(r) {
+    if (!r) return null;
+    return {
+      left: Math.round(r.left * 100) / 100,
+      top: Math.round(r.top * 100) / 100,
+      right: Math.round(r.right * 100) / 100,
+      bottom: Math.round(r.bottom * 100) / 100,
+      width: Math.round(r.width * 100) / 100,
+      height: Math.round(r.height * 100) / 100,
+      x: Math.round((r.x !== undefined ? r.x : r.left) * 100) / 100,
+      y: Math.round((r.y !== undefined ? r.y : r.top) * 100) / 100
+    };
+  }
+
+  function findPageWrapper(node) {
+    var curr = node;
+    while (curr && curr !== document.body) {
+      if (curr.classList && curr.classList.contains && curr.classList.contains('pdf-page-wrapper')) {
+        return curr;
+      }
+      curr = curr.parentElement;
+    }
+    return null;
+  }
+
+  function captureSelectionDiagnostic() {
+    var sel = window.getSelection ? window.getSelection() : null;
+    var dpr = getDevicePixelRatio();
+    var diag = {
+      buildId: BUILD_ID,
+      timestamp: new Date().toISOString(),
+      environment: {
+        devicePixelRatio: dpr,
+        userAgent: (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent : 'unknown',
+        windowInnerWidth: typeof window !== 'undefined' ? window.innerWidth : 0,
+        windowInnerHeight: typeof window !== 'undefined' ? window.innerHeight : 0,
+        scale: state.scale,
+        fitMode: state.fitMode,
+        pdfUrl: state.pdfUrl,
+        currentPage: state.currentPage,
+        totalDocumentPages: state.pages ? (state.pages.length - 1) : 0,
+        viewportScroll: viewport ? {
+          scrollTop: viewport.scrollTop,
+          scrollLeft: viewport.scrollLeft,
+          scrollWidth: viewport.scrollWidth,
+          scrollHeight: viewport.scrollHeight,
+          clientWidth: viewport.clientWidth,
+          clientHeight: viewport.clientHeight
+        } : null
+      },
+      selection: null,
+      ranges: [],
+      pages: [],
+      intersectedNodes: [],
+      dragTrace: {
+        enabled: !!state.dragTraceEnabled,
+        isSelecting: !!state.isSelecting,
+        eventCount: state.dragTraceBuffer ? state.dragTraceBuffer.length : 0,
+        events: state.dragTraceBuffer ? state.dragTraceBuffer.slice() : []
+      }
+    };
+
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      diag.selection = {
+        status: !sel ? 'no_selection_api' : (sel.rangeCount === 0 ? 'zero_ranges' : 'collapsed'),
+        isCollapsed: sel ? (sel.isCollapsed !== undefined ? Boolean(sel.isCollapsed) : true) : true,
+        rangeCount: sel ? sel.rangeCount : 0
+      };
+      return diag;
+    }
+
+    diag.selection = {
+      status: 'active',
+      isCollapsed: sel.isCollapsed,
+      rangeCount: sel.rangeCount,
+      type: sel.type,
+      anchorNode: describeNode(sel.anchorNode),
+      anchorOffset: sel.anchorOffset,
+      focusNode: describeNode(sel.focusNode),
+      focusOffset: sel.focusOffset,
+      selectedText: sel.toString ? sel.toString() : '',
+      endpointDetails: null
+    };
+
+    var targetTextNode = null;
+    var fNode = sel.focusNode;
+    if (fNode) {
+      if (fNode.nodeType === 3) {
+        targetTextNode = fNode;
+      } else if (fNode.nodeType === 1 && fNode.childNodes && fNode.childNodes.length > 0) {
+        var childIdx = Math.max(0, Math.min(sel.focusOffset, fNode.childNodes.length - 1));
+        if (fNode.childNodes[childIdx].nodeType === 3) {
+          targetTextNode = fNode.childNodes[childIdx];
+        }
+      }
+    }
+
+    if (targetTextNode) {
+      var textStr = targetTextNode.textContent || '';
+      var fOff = sel.focusOffset;
+      var spanEl = (targetTextNode.nodeType === 1) ? targetTextNode : targetTextNode.parentElement;
+      var spanRect = (spanEl && spanEl.getBoundingClientRect) ? rectToObj(spanEl.getBoundingClientRect()) : null;
+      var spanStyle = null;
+      if (spanEl && typeof window !== 'undefined' && window.getComputedStyle) {
+        var csSp = window.getComputedStyle(spanEl);
+        spanStyle = {
+          fontFamily: csSp.fontFamily,
+          fontSize: csSp.fontSize,
+          transform: csSp.transform,
+          transformOrigin: csSp.transformOrigin,
+          left: csSp.left,
+          top: csSp.top,
+          width: csSp.width,
+          height: csSp.height
+        };
+      }
+
+      // Character geometry for up to 6 characters around focus endpoint
+      var charGeometry = [];
+      var startCharIdx = Math.max(0, fOff - 3);
+      var endCharIdx = Math.min(textStr.length, fOff + 3);
+
+      if (typeof document !== 'undefined' && document.createRange) {
+        for (var ci = startCharIdx; ci < endCharIdx; ci++) {
+          try {
+            var charRng = document.createRange();
+            charRng.setStart(targetTextNode, ci);
+            charRng.setEnd(targetTextNode, ci + 1);
+            var cRects = charRng.getClientRects ? charRng.getClientRects() : null;
+            var primaryRect = (cRects && cRects.length > 0) ? rectToObj(cRects[0]) : null;
+            charGeometry.push({
+              index: ci,
+              char: textStr.charAt(ci),
+              isFocusBoundary: (ci === fOff || ci === fOff - 1),
+              clientRect: primaryRect
+            });
+          } catch (e) {}
+        }
+      }
+
+      diag.selection.endpointDetails = {
+        nodeText: textStr.length > 100 ? (textStr.substring(0, 100) + '...') : textStr,
+        fullLength: textStr.length,
+        focusOffset: fOff,
+        isAtTextEnd: (fOff >= textStr.length),
+        characterAtOffset: (fOff < textStr.length) ? textStr.charAt(fOff) : null,
+        characterBeforeOffset: (fOff > 0) ? textStr.charAt(fOff - 1) : null,
+        spanRect: spanRect,
+        spanComputedStyle: spanStyle,
+        nearbyCharacterGeometry: charGeometry
+      };
+    }
+
+    var affectedPages = new Set();
+
+    for (var rIdx = 0; rIdx < sel.rangeCount; rIdx++) {
+      var range = sel.getRangeAt(rIdx);
+      var bRect = rectToObj(range.getBoundingClientRect ? range.getBoundingClientRect() : null);
+      var cRects = [];
+      if (range.getClientRects) {
+        var domRectList = range.getClientRects();
+        for (var cr = 0; cr < domRectList.length; cr++) {
+          cRects.push(rectToObj(domRectList[cr]));
+        }
+      }
+
+      diag.ranges.push({
+        rangeIndex: rIdx,
+        startContainer: describeNode(range.startContainer),
+        startOffset: range.startOffset,
+        endContainer: describeNode(range.endContainer),
+        endOffset: range.endOffset,
+        collapsed: range.collapsed,
+        boundingClientRect: bRect,
+        clientRects: cRects
+      });
+
+      var pStart = findPageWrapper(range.startContainer);
+      if (pStart) {
+        var numStart = parseInt(pStart.getAttribute('data-page-num') || (pStart.dataset && pStart.dataset.pageNum), 10);
+        if (numStart) affectedPages.add(numStart);
+      }
+      var pEnd = findPageWrapper(range.endContainer);
+      if (pEnd) {
+        var numEnd = parseInt(pEnd.getAttribute('data-page-num') || (pEnd.dataset && pEnd.dataset.pageNum), 10);
+        if (numEnd) affectedPages.add(numEnd);
+      }
+    }
+
+    if (affectedPages.size === 0 && state.currentPage) {
+      affectedPages.add(state.currentPage);
+    }
+
+    affectedPages.forEach(function(pageNum) {
+      var pState = state.pages ? state.pages[pageNum] : null;
+      if (!pState || !pState.wrapper) return;
+      var wRect = pState.wrapper.getBoundingClientRect ? rectToObj(pState.wrapper.getBoundingClientRect()) : null;
+      var cRect = pState.canvas && pState.canvas.getBoundingClientRect ? rectToObj(pState.canvas.getBoundingClientRect()) : null;
+      var tRect = pState.textLayer && pState.textLayer.getBoundingClientRect ? rectToObj(pState.textLayer.getBoundingClientRect()) : null;
+
+      var textLayerStyle = null;
+      var textLayerSelectionStyle = null;
+      if (pState.textLayer && typeof window !== 'undefined' && window.getComputedStyle) {
+        var cs = window.getComputedStyle(pState.textLayer);
+        textLayerStyle = {
+          position: cs.position,
+          transform: cs.transform,
+          overflow: cs.overflow,
+          userSelect: cs.userSelect,
+          webkitUserSelect: cs.webkitUserSelect,
+          pointerEvents: cs.pointerEvents,
+          width: cs.width,
+          height: cs.height,
+          left: cs.left,
+          top: cs.top
+        };
+        try {
+          var csTLSel = window.getComputedStyle(pState.textLayer, '::selection');
+          if (csTLSel) {
+            textLayerSelectionStyle = {
+              backgroundColor: csTLSel.backgroundColor,
+              color: csTLSel.color
+            };
+          }
+        } catch (e) {}
+      }
+
+      var wrapperSelectionStyle = null;
+      if (pState.wrapper && typeof window !== 'undefined' && window.getComputedStyle) {
+        try {
+          var csWSel = window.getComputedStyle(pState.wrapper, '::selection');
+          if (csWSel) {
+            wrapperSelectionStyle = {
+              backgroundColor: csWSel.backgroundColor,
+              color: csWSel.color
+            };
+          }
+        } catch (e) {}
+      }
+
+      diag.pages.push({
+        pageNum: pageNum,
+        wrapperRect: wRect,
+        wrapperSelectionStyle: wrapperSelectionStyle,
+        canvasRect: cRect,
+        canvasWidth: pState.canvas ? pState.canvas.width : 0,
+        canvasHeight: pState.canvas ? pState.canvas.height : 0,
+        textLayerRect: tRect,
+        textLayerComputedStyle: textLayerStyle,
+        textLayerSelectionStyle: textLayerSelectionStyle
+      });
+
+      if (pState.textLayer) {
+        var children = pState.textLayer.childNodes;
+        for (var i = 0; i < children.length; i++) {
+          var child = children[i];
+          var isIntersected = false;
+          var rangeDetails = [];
+
+          for (var ri = 0; ri < sel.rangeCount; ri++) {
+            var rng = sel.getRangeAt(ri);
+            var intersects = false;
+            try {
+              if (rng.intersectsNode) {
+                intersects = rng.intersectsNode(child);
+              } else if (typeof document !== 'undefined' && document.createRange) {
+                var testRng = document.createRange();
+                testRng.selectNode(child);
+                intersects = (rng.compareBoundaryPoints(Range.END_TO_START, testRng) < 0 &&
+                              rng.compareBoundaryPoints(Range.START_TO_END, testRng) > 0);
+              }
+            } catch (e) {
+              intersects = false;
+            }
+
+            if (intersects) {
+              isIntersected = true;
+              var isStart = (rng.startContainer === child || (child.contains && child.contains(rng.startContainer)));
+              var isEnd = (rng.endContainer === child || (child.contains && child.contains(rng.endContainer)));
+              var sOff = 0;
+              var eOff = child.textContent ? child.textContent.length : 0;
+              if (isStart) {
+                sOff = rng.startOffset;
+              }
+              if (isEnd) {
+                eOff = rng.endOffset;
+              }
+              rangeDetails.push({
+                rangeIndex: ri,
+                isStart: isStart,
+                startOffset: sOff,
+                isEnd: isEnd,
+                endOffset: eOff
+              });
+            }
+          }
+
+          if (isIntersected) {
+            var nodeRect = child.getBoundingClientRect ? rectToObj(child.getBoundingClientRect()) : null;
+            var nodeCRects = [];
+            if (child.getClientRects) {
+              var ncrs = child.getClientRects();
+              for (var nci = 0; nci < ncrs.length; nci++) {
+                nodeCRects.push(rectToObj(ncrs[nci]));
+              }
+            }
+
+            var subRangeRects = [];
+            if (typeof document !== 'undefined' && document.createRange) {
+              var targetTextNode = null;
+              if (child.nodeType === 3) {
+                targetTextNode = child;
+              } else if (child.firstChild && child.firstChild.nodeType === 3) {
+                targetTextNode = child.firstChild;
+              }
+              if (targetTextNode) {
+                for (var rd = 0; rd < rangeDetails.length; rd++) {
+                  try {
+                    var maxLen = targetTextNode.textContent ? targetTextNode.textContent.length : 0;
+                    var startChar = Math.max(0, Math.min(rangeDetails[rd].startOffset, maxLen));
+                    var endChar = Math.max(startChar, Math.min(rangeDetails[rd].endOffset, maxLen));
+                    if (startChar < endChar) {
+                      var subRng = document.createRange();
+                      subRng.setStart(targetTextNode, startChar);
+                      subRng.setEnd(targetTextNode, endChar);
+                      var subCRs = subRng.getClientRects();
+                      for (var sci = 0; sci < subCRs.length; sci++) {
+                        subRangeRects.push(rectToObj(subCRs[sci]));
+                      }
+                    }
+                  } catch (e) {}
+                }
+              }
+            }
+
+            var elemStyle = null;
+            var targetEl = (child.nodeType === 1) ? child : child.parentElement;
+            if (targetEl && typeof window !== 'undefined' && window.getComputedStyle) {
+              var csE = window.getComputedStyle(targetEl);
+              elemStyle = {
+                position: csE.position,
+                left: csE.left,
+                top: csE.top,
+                width: csE.width,
+                height: csE.height,
+                transform: csE.transform,
+                transformOrigin: csE.transformOrigin,
+                display: csE.display,
+                visibility: csE.visibility,
+                opacity: csE.opacity,
+                userSelect: csE.userSelect,
+                webkitUserSelect: csE.webkitUserSelect,
+                pointerEvents: csE.pointerEvents,
+                fontSize: csE.fontSize,
+                fontFamily: csE.fontFamily,
+                lineHeight: csE.lineHeight,
+                whiteSpace: csE.whiteSpace
+              };
+            }
+
+            var elemSelectionStyle = null;
+            if (targetEl && typeof window !== 'undefined' && window.getComputedStyle) {
+              try {
+                var csElSel = window.getComputedStyle(targetEl, '::selection');
+                if (csElSel) {
+                  elemSelectionStyle = {
+                    backgroundColor: csElSel.backgroundColor,
+                    color: csElSel.color
+                  };
+                }
+              } catch (e) {}
+            }
+
+            var textPreview = '';
+            if (child.textContent) {
+              textPreview = child.textContent.length > 80 ? (child.textContent.substring(0, 80) + '...') : child.textContent;
+            }
+
+            var attributes = {};
+            if (child.attributes) {
+              for (var a = 0; a < child.attributes.length; a++) {
+                var attr = child.attributes[a];
+                attributes[attr.name] = attr.value;
+              }
+            }
+
+            diag.intersectedNodes.push({
+              childIndex: i,
+              nodeType: child.nodeType,
+              nodeName: child.nodeName,
+              className: child.nodeType === 1 ? (child.className || '') : '',
+              parentTagName: child.parentElement ? child.parentElement.tagName : null,
+              parentClassName: child.parentElement ? (child.parentElement.className || '') : null,
+              attributes: attributes,
+              textPreview: textPreview,
+              rangeEndpoints: rangeDetails,
+              boundingClientRect: nodeRect,
+              clientRects: nodeCRects,
+              subRangeClientRects: subRangeRects,
+              computedStyle: elemStyle,
+              selectionStyle: elemSelectionStyle
+            });
+          }
+        }
+      }
+    });
+
+    diag.dragTrace = {
+      enabled: !!state.dragTraceEnabled,
+      isSelecting: !!state.isSelecting,
+      eventCount: state.dragTraceBuffer ? state.dragTraceBuffer.length : 0,
+      events: state.dragTraceBuffer ? state.dragTraceBuffer.slice() : []
+    };
+
+    return diag;
+  }
+
+  function exportSelectionDiagnostic() {
+    var diag = captureSelectionDiagnostic();
+    var jsonStr = JSON.stringify(diag, null, 2);
+    console.log('[Vortex Selection Diagnostic ' + BUILD_ID + ']\n' + jsonStr);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(jsonStr).then(function() {
+        showToast('Selection diagnostic copied to clipboard (' + BUILD_ID + ')');
+      }).catch(function() {
+        showManualCopyDialog(jsonStr, 'Vortex Selection Diagnostic (' + BUILD_ID + ')');
+      });
+    } else {
+      showManualCopyDialog(jsonStr, 'Vortex Selection Diagnostic (' + BUILD_ID + ')');
+    }
+    return diag;
+  }
+
   function handleViewportScroll() {
+    state.cachedViewportRect = null;
     if (state.scrollThrottleRAF) return;
     state.scrollThrottleRAF = requestAnimationFrame(function() {
       state.scrollThrottleRAF = null;
@@ -3155,6 +3729,7 @@ def get_pdf_viewer_js() -> str:
 
   /* --- Ghost UI Logic --- */
   function resetHudTimer(e) {
+    if (state.isSelecting) return;
     modal.classList.remove('hud-hidden');
     clearTimeout(state.hudTimeout);
     state.hudTimeout = setTimeout(function() {
@@ -3341,6 +3916,7 @@ def get_pdf_viewer_js() -> str:
     document.body.style.overflow = '';
 
     // Stop active processes
+    finishSelecting();
     stopAutoScroll();
     if (state.scrollThrottleRAF) {
       cancelAnimationFrame(state.scrollThrottleRAF);
@@ -3562,9 +4138,8 @@ def get_pdf_viewer_js() -> str:
             return null;
           }
           pageState.hasText = true;
-          var processed = processReadingOrder(textContent, displayViewport);
-          pageState.processedContent = processed;
-          return processed;
+          pageState.processedContent = textContent;
+          return textContent;
         });
 
     return textPromise.then(function(processedContent) {
@@ -3766,6 +4341,66 @@ def get_pdf_viewer_js() -> str:
   }
 
   /* --- Pointer / Mouse Interactions --- */
+  function finishSelecting() {
+    state.isSelecting = false;
+    state.cachedViewportRect = null;
+    if (viewport) {
+      viewport.classList.remove('selecting');
+    }
+    if (pagesContainer) {
+      var selectingLayers = pagesContainer.querySelectorAll('.textLayer.selecting');
+      for (var s = 0; s < selectingLayers.length; s++) {
+        selectingLayers[s].classList.remove('selecting');
+      }
+    }
+  }
+
+  function recordDragTraceEvent(type, extra) {
+    if (!state.dragTraceEnabled) return;
+    var now = typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+    var sel = (typeof window !== 'undefined' && window.getSelection) ? window.getSelection() : null;
+    var selInfo = null;
+    if (sel) {
+      selInfo = {
+        isCollapsed: sel.isCollapsed,
+        rangeCount: sel.rangeCount,
+        anchor: sel.anchorNode ? {
+          nodeType: sel.anchorNode.nodeType,
+          nodeName: sel.anchorNode.nodeName,
+          parentTag: sel.anchorNode.parentElement ? sel.anchorNode.parentElement.tagName : null,
+          offset: sel.anchorOffset
+        } : null,
+        focus: sel.focusNode ? {
+          nodeType: sel.focusNode.nodeType,
+          nodeName: sel.focusNode.nodeName,
+          parentTag: sel.focusNode.parentElement ? sel.focusNode.parentElement.tagName : null,
+          offset: sel.focusOffset,
+          textLength: sel.focusNode.textContent ? sel.focusNode.textContent.length : null,
+          isAtEnd: (sel.focusNode.textContent) ? (sel.focusOffset >= sel.focusNode.textContent.length) : false
+        } : null
+      };
+    }
+
+    var deltaMs = state.lastDragEventTime ? Math.round((now - state.lastDragEventTime) * 100) / 100 : 0;
+    state.lastDragEventTime = now;
+
+    var entry = {
+      seq: ++state.dragEventSeq,
+      type: type,
+      timestamp: Math.round(now * 100) / 100,
+      deltaMs: deltaMs,
+      pointer: extra && typeof extra.x === 'number' ? { x: extra.x, y: extra.y } : null,
+      selection: selInfo,
+      isSelecting: state.isSelecting,
+      pinnedCount: state.pinnedPages ? state.pinnedPages.size : 0
+    };
+
+    state.dragTraceBuffer.push(entry);
+    if (state.dragTraceBuffer.length > 50) {
+      state.dragTraceBuffer.shift();
+    }
+  }
+
   function handleMouseDown(e) {
     if (!state.isOpen) return;
 
@@ -3838,12 +4473,22 @@ def get_pdf_viewer_js() -> str:
 
     // 5. Standard drag selection start
     if (e.button === 0) {
+      state.isSelecting = true;
+      if (viewport) {
+        viewport.classList.add('selecting');
+        state.cachedViewportRect = viewport.getBoundingClientRect();
+      }
+      var targetTextLayer = (e && e.target && e.target.closest) ? e.target.closest('.textLayer') : null;
+      if (targetTextLayer) {
+        targetTextLayer.classList.add('selecting');
+      }
       var caret = getCaretPositionFromPoint(e.clientX, e.clientY);
       if (caret && caret.node) {
         state.selectionAnchor = { node: caret.node, offset: caret.offset };
       } else {
         state.selectionAnchor = null;
       }
+      recordDragTraceEvent('mousedown', { x: e.clientX, y: e.clientY });
     }
   }
 
@@ -3881,9 +4526,20 @@ def get_pdf_viewer_js() -> str:
 
     // Edge Auto-Scrolling during normal drag selection
     if (e.buttons & 1 && !state.rectSelectMode && !state.isSpacePressed) {
+      if (!state.isSelecting) {
+        state.isSelecting = true;
+        if (viewport) {
+          viewport.classList.add('selecting');
+          if (!state.cachedViewportRect) state.cachedViewportRect = viewport.getBoundingClientRect();
+        }
+      }
       checkEdgeAutoScroll(e.clientX, e.clientY);
+      recordDragTraceEvent('mousemove', { x: e.clientX, y: e.clientY });
     } else {
       stopAutoScroll();
+      if (state.isSelecting && !(e.buttons & 1)) {
+        finishSelecting();
+      }
     }
   }
 
@@ -3896,6 +4552,11 @@ def get_pdf_viewer_js() -> str:
     }
 
     stopAutoScroll();
+
+    if (state.isSelecting) {
+      recordDragTraceEvent('mouseup', { x: e.clientX, y: e.clientY });
+      finishSelecting();
+    }
 
     // Finish Rectangular Selection
     if (state.rectSelectMode && state.rectBox && state.rectEl) {
@@ -4042,7 +4703,11 @@ def get_pdf_viewer_js() -> str:
 
   /* --- Edge Auto-Scrolling --- */
   function checkEdgeAutoScroll(clientX, clientY) {
-    var vRect = viewport.getBoundingClientRect();
+    var vRect = state.cachedViewportRect;
+    if (!vRect) {
+      vRect = viewport.getBoundingClientRect();
+      state.cachedViewportRect = vRect;
+    }
     var MARGIN = 40;
     var MAX_SPEED = 18;
 
@@ -4293,8 +4958,10 @@ def get_pdf_viewer_js() -> str:
     }
   }
 
-  function showManualCopyDialog(text) {
+  function showManualCopyDialog(text, title) {
     if (!copyDialog || !copyDialogTextarea) return;
+    var titleEl = document.getElementById('pdf-copy-dialog-title');
+    if (titleEl) titleEl.textContent = title || 'Copy Selected Text';
     copyDialogTextarea.value = text;
     copyDialog.style.display = 'flex';
     copyDialogTextarea.focus();
@@ -4528,7 +5195,12 @@ def get_pdf_viewer_js() -> str:
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
       hideTouchHandles();
+      return;
     }
+    if (sel.anchorNode && state.isSelecting) {
+      state.selectionAnchor = { node: sel.anchorNode, offset: sel.anchorOffset };
+    }
+    recordDragTraceEvent('selectionchange', null);
   }
 
   /* --- Keyboard Shortcuts & Accessibility --- */
@@ -4580,6 +5252,13 @@ def get_pdf_viewer_js() -> str:
       }
     }
 
+    // Ctrl/Cmd + Shift + D (or Alt + D): Export selection diagnostic
+    if ((e.ctrlKey || e.metaKey) && (e.shiftKey || e.altKey) && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      exportSelectionDiagnostic();
+      return;
+    }
+
     // R: Toggle Rectangular Selection
     if (e.key === 'r' || e.key === 'R') {
       if (!e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -4608,6 +5287,7 @@ def get_pdf_viewer_js() -> str:
   function handleWindowBlur() {
     state.isSpacePressed = false;
     state.isPanning = false;
+    finishSelecting();
     stopAutoScroll();
     if (viewport) viewport.classList.remove('panning-ready', 'panning-active');
   }

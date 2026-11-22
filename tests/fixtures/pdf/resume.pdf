@@ -1,0 +1,49 @@
+%PDF-1.4
+%\xe2\xe3\xcf\xd3
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1101 >>
+stream
+BT /F1 14 Tf 1 0 0 1 50 720 Tm (PROFESSIONAL EXPERIENCE) Tj ET
+0.75 w 50 712 m 550 712 l S
+BT /F1 11 Tf 1 0 0 1 50 695 Tm (Staff Software Engineer - Core Infrastructure) Tj ET
+BT /F1 10 Tf 1 0 0 1 470 695 Tm (2021 - Present) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 680 Tm (Vortex Systems Inc.) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 660 Tm (\225) Tj ET
+BT /F1 10 Tf 1 0 0 1 65 660 Tm (Architected distributed synchronization engine handling 50k+ files across) Tj ET
+BT /F1 10 Tf 1 0 0 1 65 646 Tm (heterogeneous desktop and mobile platforms with bounded memory footprint.) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 626 Tm (\225) Tj ET
+BT /F1 10 Tf 1 0 0 1 65 626 Tm (Spearheaded Linux kernel and Wayland compositor integration improvements) Tj ET
+BT /F1 10 Tf 1 0 0 1 65 612 Tm (eliminating visual artifacts and improving overall UI frame rates by 40%.) Tj ET
+BT /F1 14 Tf 1 0 0 1 50 580 Tm (EDUCATION) Tj ET
+0.75 w 50 572 m 550 572 l S
+BT /F1 11 Tf 1 0 0 1 50 555 Tm (B.S. in Computer Science and Engineering) Tj ET
+BT /F1 10 Tf 1 0 0 1 470 555 Tm (2017 - 2021) Tj ET
+BT /F1 10 Tf 1 0 0 1 50 540 Tm (Institute of Technology) Tj ET
+
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000027 00000 n 
+0000000076 00000 n 
+0000000133 00000 n 
+0000000259 00000 n 
+0000001412 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1509
+%%EOF

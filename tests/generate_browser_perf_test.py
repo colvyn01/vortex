@@ -211,6 +211,7 @@ def build_harness_html() -> str:
   <h1>Vortex PDF Performance & Resource Verification</h1>
   <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: -0.25rem; margin-bottom: 1rem;">
     Verification harness embedded with real Vortex viewer components (HTML, CSS, JS).
+    &bull; Loaded Viewer Build: <span id="harness-build-id" class="mono" style="color: var(--accent); font-weight: 600;">detecting...</span>
   </p>
 
   <div class="disclaimer-box">
@@ -230,10 +231,22 @@ def build_harness_html() -> str:
       <!-- Control Buttons -->
       <button id="btn-stop" class="btn btn-stop" disabled>Stop / Cancel</button>
       <button id="btn-open-manual" class="btn btn-secondary">Open 3-Page</button>
+      <button id="btn-open-lists" class="btn btn-secondary">Open Lists Fixture</button>
+      <button id="btn-open-resume" class="btn btn-secondary">Open Résumé Fixture</button>
       <button id="btn-close-manual" class="btn btn-secondary">Close Viewer</button>
       <!-- Export -->
+      <button id="btn-toggle-trace" class="btn btn-secondary">Toggle Drag Trace (Off)</button>
+      <button id="btn-capture-diag" class="btn btn-export">Capture Diag</button>
       <button id="btn-export-json" class="btn btn-export">Export JSON</button>
       <button id="btn-export-log" class="btn btn-secondary">Export Log</button>
+    </div>
+
+    <div id="diag-container" style="display: none; margin-top: 1rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <strong style="color: var(--accent); font-size: 0.85rem;">Selection Diagnostic JSON:</strong>
+        <button id="btn-close-diag-view" class="btn btn-secondary" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Hide</button>
+      </div>
+      <pre id="diag-display" style="max-height: 250px; overflow: auto; background: #0a0e14; border: 1px solid #2a364a; padding: 10px; border-radius: 6px; font-size: 0.72rem; color: #64d2ff;"></pre>
     </div>
 
     <table id="results-table">
@@ -714,9 +727,53 @@ def build_harness_html() -> str:
     document.getElementById('btn-open-manual').addEventListener('click', () => {{
       window.VortexPdfViewer.open('/tests/fixtures/pdf/multipage.pdf', 'multipage.pdf');
     }});
+    document.getElementById('btn-open-lists').addEventListener('click', () => {{
+      window.VortexPdfViewer.open('/tests/fixtures/pdf/lists.pdf', 'lists.pdf');
+    }});
+    document.getElementById('btn-open-resume').addEventListener('click', () => {{
+      window.VortexPdfViewer.open('/tests/fixtures/pdf/resume.pdf', 'resume.pdf');
+    }});
     document.getElementById('btn-close-manual').addEventListener('click', () => {{
       window.VortexPdfViewer.close();
     }});
+
+    var toggleTraceBtn = document.getElementById('btn-toggle-trace');
+    if (toggleTraceBtn) {{
+      toggleTraceBtn.addEventListener('click', function() {{
+        if (window.VortexPdfViewer && window.VortexPdfViewer.enableDragTrace) {{
+          var isEnabled = window.VortexPdfViewer.isDragTraceEnabled();
+          var newState = window.VortexPdfViewer.enableDragTrace(!isEnabled);
+          this.textContent = 'Toggle Drag Trace (' + (newState ? 'ON' : 'Off') + ')';
+          log('Real-time drag trace ' + (newState ? 'ENABLED (recording up to 50 drag events)' : 'DISABLED'));
+        }}
+      }});
+    }}
+
+    document.getElementById('btn-capture-diag').addEventListener('click', () => {{
+      if (window.VortexPdfViewer && window.VortexPdfViewer.exportSelectionDiagnostic) {{
+        var d = window.VortexPdfViewer.exportSelectionDiagnostic();
+        var cont = document.getElementById('diag-container');
+        var box = document.getElementById('diag-display');
+        if (cont && box) {{
+          cont.style.display = 'block';
+          box.textContent = JSON.stringify(d, null, 2);
+        }}
+      }}
+    }});
+    document.getElementById('btn-close-diag-view').addEventListener('click', () => {{
+      var cont = document.getElementById('diag-container');
+      if (cont) cont.style.display = 'none';
+    }});
+
+    // Update loaded build id badge
+    function updateHarnessBuildBadge() {{
+      var badge = document.getElementById('harness-build-id');
+      if (badge && window.VortexPdfViewer && window.VortexPdfViewer.buildId) {{
+        badge.textContent = window.VortexPdfViewer.buildId;
+      }}
+    }}
+    document.addEventListener('DOMContentLoaded', updateHarnessBuildBadge);
+    setTimeout(updateHarnessBuildBadge, 150);
 
     document.getElementById('btn-export-json').addEventListener('click', exportResultsJson);
     document.getElementById('btn-export-log').addEventListener('click', exportLogText);

@@ -62,10 +62,10 @@ class TestPdfViewerComponents(unittest.TestCase):
     def test_pdf_viewer_css_selection_and_textlayer(self):
         css = get_pdf_viewer_css()
 
-        # Page wrapper & canvas
+        # Page wrapper & canvas (wrapper container must be non-selectable)
         self.assertIn('.pdf-page-wrapper', css)
-        self.assertIn('user-select: text;', css)
-        self.assertIn('-webkit-user-select: text;', css)
+        self.assertIn('user-select: none;', css)
+        self.assertIn('-webkit-user-select: none;', css)
         self.assertIn('.pdf-page-canvas', css)
         self.assertIn('pointer-events: none;', css)
 
@@ -76,11 +76,20 @@ class TestPdfViewerComponents(unittest.TestCase):
         self.assertIn('forced-color-adjust: none;', css)
         self.assertIn('.textLayer :is(span, br)', css)
         self.assertIn('color: transparent;', css)
+        self.assertIn('.textLayer span', css)
 
-        # Okular-inspired selection style
-        self.assertIn('.textLayer ::selection', css)
+        # Line breaks, marked-content, and endOfContent transparent selection rules
+        self.assertIn('.textLayer br', css)
+        self.assertIn('.textLayer br::selection', css)
+        self.assertIn('.textLayer span.markedContent::selection', css)
+        self.assertIn('.textLayer .endOfContent', css)
+        self.assertIn('.textLayer .endOfContent::selection', css)
+        self.assertIn('.textLayer.selecting .endOfContent', css)
+
+        # Okular-inspired selection style on text spans
+        self.assertIn('.textLayer span::selection', css)
         self.assertIn('rgba(61, 174, 233, 0.42)', css)
-        self.assertIn('.textLayer ::-moz-selection', css)
+        self.assertIn('.textLayer span::-moz-selection', css)
 
         # Space Panning states
         self.assertIn('.pdf-viewport.panning-ready', css)
@@ -118,6 +127,11 @@ class TestPdfViewerComponents(unittest.TestCase):
         self.assertIn('normalizeCopyText: normalizeCopyText', js)
         self.assertIn('getDiagnostics: getDiagnostics', js)
         self.assertIn('updateVirtualization: updateVirtualization', js)
+        self.assertIn('buildId: BUILD_ID,', js)
+        self.assertIn('captureSelectionDiagnostic: captureSelectionDiagnostic', js)
+        self.assertIn('exportSelectionDiagnostic: exportSelectionDiagnostic', js)
+        self.assertIn('enableDragTrace:', js)
+        self.assertIn('getDragTrace:', js)
 
         # Performance, virtualization, and bounded concurrency
         self.assertIn('MAX_CONCURRENT_RENDERS = 1', js)
@@ -156,6 +170,7 @@ class TestPdfViewerComponents(unittest.TestCase):
             "multipage_20.pdf",
             "multipage_50.pdf",
             "scanned_textless.pdf",
+            "resume.pdf",
         ]
         for name in required:
             f = fixtures_dir / name

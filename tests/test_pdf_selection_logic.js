@@ -43,15 +43,31 @@ function createPdfViewerEnv(options = {}) {
       attributes: {},
       setAttribute(k, v) { this.attributes[k] = String(v); },
       getAttribute(k) { return this.attributes[k]; },
-      addEventListener() {},
-      removeEventListener() {},
+      addEventListener(type, fn) {
+        this._listeners = this._listeners || {};
+        this._listeners[type] = this._listeners[type] || [];
+        this._listeners[type].push(fn);
+      },
+      removeEventListener(type, fn) {
+        if (!this._listeners || !this._listeners[type]) return;
+        this._listeners[type] = this._listeners[type].filter(f => f !== fn);
+      },
+      dispatchEvent(evt) {
+        if (this._listeners && this._listeners[evt.type]) {
+          this._listeners[evt.type].forEach(fn => fn(evt));
+        }
+      },
+      getBoundingClientRect() {
+        return { left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600 };
+      },
       appendChild(ch) { return ch; },
       removeChild(ch) { return ch; },
       querySelector(sel) { return null; },
       querySelectorAll(sel) { return []; },
       contains(target) { return false; },
       focus() {},
-      select() {}
+      select() {},
+      getContext: () => ({ fillRect() {}, clearRect() {}, getImageData() {}, putImageData() {} })
     };
     elements[id] = el;
     return el;
@@ -91,6 +107,7 @@ function createPdfViewerEnv(options = {}) {
   makeElement("pdf-selection-menu");
   makeElement("pdf-copy-btn", "button");
   makeElement("pdf-copy-nolinebreaks-btn", "button");
+  makeElement("pdf-diag-btn", "button");
   makeElement("pdf-copy-dialog");
   makeElement("pdf-copy-dialog-textarea", "textarea");
   makeElement("pdf-copy-dialog-close", "button");
@@ -122,6 +139,7 @@ function createPdfViewerEnv(options = {}) {
     body: { style: {} },
     getSelection: () => ({
       rangeCount: 0,
+      isCollapsed: true,
       toString: () => "",
       removeAllRanges() {},
       addRange() {}
@@ -165,8 +183,9 @@ function createPdfViewerEnv(options = {}) {
   };
 
   // Provide pdfjsLib mock in global scope
-  sandbox.pdfjsLib = {
+  const mockPdfjsLib = {
     GlobalWorkerOptions: {},
+    renderTextLayer: (params) => ({ promise: Promise.resolve() }),
     getDocument: () => ({
       promise: Promise.resolve({
         numPages: numPages,
@@ -187,6 +206,8 @@ function createPdfViewerEnv(options = {}) {
       })
     })
   };
+  sandbox.pdfjsLib = mockPdfjsLib;
+  mockWindow.pdfjsLib = mockPdfjsLib;
 
   vm.createContext(sandbox);
 
@@ -201,6 +222,8 @@ function createPdfViewerEnv(options = {}) {
   return {
     window: sandbox.window,
     document: sandbox.document,
+    pdfjsLib: mockPdfjsLib,
+    sandbox: sandbox,
     viewer: sandbox.window.VortexPdfViewer,
     elements: elements,
     listeners: listeners,
@@ -307,8 +330,33 @@ test("processReadingOrder: Degraded or few items handled conservatively without 
 // ---------------------------------------------------------
 
 test("Two Copy Actions: Ordinary Copy preserves raw extracted text and line breaks", () => {
-  const rawText = "First line of paragraph.\nSecond line of paragraph.\n\nSecond paragraph here.";
-  assert.strictEqual(rawText, "First line of paragraph.\nSecond line of paragraph.\n\nSecond paragraph here.");
+  const env = createPdfViewerEnv();
+  let writtenText = null;
+  env.sandbox.navigator.clipboard.writeText = (txt) => {
+    writtenText = txt;
+    return Promise.resolve();
+  };
+
+  const multiLinePassage =
+    "Architected distributed synchronization engine handling 50k+ files across\n" +
+    "heterogeneous desktop and mobile platforms with bounded memory footprint.\n" +
+    "• Spearheaded Linux kernel and Wayland compositor integration improvements\n" +
+    "eliminating visual artifacts and improving overall UI frame rates by 40%.";
+
+  env.window.getSelection = () => ({
+    toString: () => multiLinePassage
+  });
+
+  // Ordinary Copy (normalize = false): must preserve exact raw lines without joining words across line breaks
+  env.viewer.copySelection(false);
+  assert.strictEqual(writtenText, multiLinePassage);
+
+  // Copy without line breaks (normalize = true): must join intra-paragraph lines with space and preserve list boundaries
+  env.viewer.copySelection(true);
+  const expectedNormalized =
+    "Architected distributed synchronization engine handling 50k+ files across heterogeneous desktop and mobile platforms with bounded memory footprint.\n\n" +
+    "• Spearheaded Linux kernel and Wayland compositor integration improvements eliminating visual artifacts and improving overall UI frame rates by 40%.";
+  assert.strictEqual(writtenText, expectedNormalized);
 });
 
 test("Copy without line breaks: Joins wrapped lines within paragraph with single space", () => {
@@ -771,5 +819,315 @@ test("Lifecycle Teardown: close() destroys PDF.js document to terminate Web Work
   assert.strictEqual(env.isDocDestroyed(), false);
   env.viewer.close();
   assert.strictEqual(env.isDocDestroyed(), true, "pdfDoc.destroy() must be called to free PDF.js worker threads");
+});
+
+// ---------------------------------------------------------
+// 13. Text Layer DOM Stream Order & Selection Fidelity
+// ---------------------------------------------------------
+
+test("Text Layer Stream Order: Preserves bullet and text sequence without inverted line breaks", async () => {
+  let capturedTextContent = null;
+  const resumeItems = [
+    { str: "PROFESSIONAL EXPERIENCE", transform: [14, 0, 0, 14, 50, 720], width: 140, height: 14, hasEOL: true },
+    { str: "Staff Software Engineer", transform: [11, 0, 0, 11, 50, 695], width: 180, height: 11, hasEOL: false },
+    { str: "2021 – Present", transform: [10, 0, 0, 10, 470, 695], width: 80, height: 10, hasEOL: true },
+    { str: "•", transform: [10, 0, 0, 10, 50, 675], width: 8, height: 10, hasEOL: false },
+    { str: "Architected distributed synchronization engine handling 50k+ files across", transform: [10, 0, 0, 10, 65, 680], width: 340, height: 10, hasEOL: true },
+    { str: "heterogeneous desktop and mobile platforms with bounded memory footprint.", transform: [10, 0, 0, 10, 65, 665], width: 350, height: 10, hasEOL: true }
+  ];
+
+  const env = createPdfViewerEnv({ numPages: 1 });
+  // Intercept renderTextLayer call to verify text content source
+  let renderedSource = null;
+  env.pdfjsLib.renderTextLayer = (params) => {
+    renderedSource = params.textContentSource || params.textContent;
+    return { promise: Promise.resolve() };
+  };
+
+  // Mock page with custom resume content
+  env.pdfjsLib.getDocument = () => ({
+    promise: Promise.resolve({
+      numPages: 1,
+      destroy: () => {},
+      getPage: () => Promise.resolve({
+        getViewport: () => ({ width: 612, height: 792, scale: 1.0 }),
+        render: () => ({ promise: Promise.resolve(), cancel: () => {} }),
+        getTextContent: () => Promise.resolve({
+          items: resumeItems,
+          styles: {}
+        })
+      })
+    })
+  });
+
+  env.simulateOpen();
+  await new Promise(r => setTimeout(r, 60));
+
+  assert.ok(renderedSource, "renderTextLayer must be called with text content");
+  const strings = renderedSource.items.map(it => it.str);
+
+  // Verify bullet point index is strictly before line 1 of the bulleted paragraph
+  const bulletIdx = strings.findIndex(s => s === "•");
+  const textIdx = strings.findIndex(s => s.startsWith("Architected"));
+  assert.ok(bulletIdx < textIdx, "Bullet symbol '•' must precede the paragraph text in DOM text layer");
+
+  // Verify right-aligned date item remains in content stream order
+  const dateIdx = strings.findIndex(s => s === "2021 – Present");
+  const titleIdx = strings.findIndex(s => s === "Staff Software Engineer");
+  assert.ok(titleIdx < dateIdx, "Job title must precede date in DOM stream order");
+  assert.ok(dateIdx < bulletIdx, "Date must precede subsequent bullet point");
+
+  env.viewer.close();
+});
+
+test("Selection CSS Integrity: Br, marked-content, and endOfContent elements do not have visible selection backgrounds", () => {
+  const { execFileSync } = require('child_process');
+  const css = execFileSync("python3", [
+    "-c",
+    "from src.media_viewer import get_pdf_viewer_css; import sys; sys.stdout.write(get_pdf_viewer_css())"
+  ], { encoding: "utf8" });
+
+  // 1. .pdf-page-wrapper must not be selectable text to prevent container highlight artifacts
+  assert.match(css, /\.pdf-page-wrapper\s*\{[^}]*user-select:\s*none;/);
+
+  // 1b. .textLayer must be non-selectable container to prevent selection jumping to container child indices
+  assert.match(css, /\.textLayer\s*\{[^}]*user-select:\s*none;/);
+  assert.match(css, /\.textLayer\s+span\s*\{[^}]*user-select:\s*text;/);
+
+  // 2. Vendor prefix separation check: NO comma-separated rules mixing ::selection with ::-moz-selection
+  // (Mixing causes Chromium/Blink to discard the entire selector rule block as invalid)
+  const groupedVendorRegex = /::selection\s*,\s*[^\{]*::-moz-selection|::-moz-selection\s*,\s*[^\{]*::selection/;
+  assert.ok(!groupedVendorRegex.test(css), "Standard ::selection must never be comma-grouped with ::-moz-selection");
+
+  // 3. !important check: Highlight pseudo-elements must NOT contain !important declarations
+  // (CSS Pseudo-Elements Level 4 invalidates declarations containing !important in highlight pseudos)
+  const selectionBlocks = css.match(/[^\{\}]*::(?:-moz-)?selection\s*\{[^}]*\}/g) || [];
+  selectionBlocks.forEach(block => {
+    assert.ok(!block.includes("!important"), `Highlight pseudo-element declaration must not contain !important: ${block}`);
+  });
+
+  // 4. Default transparent selection on .textLayer container so descendants do not inherit selection background
+  assert.match(css, /\.textLayer::selection\s*\{[^}]*background:\s*transparent;/);
+  assert.match(css, /\.textLayer\s+::selection\s*\{[^}]*background:\s*transparent;/);
+
+  // 5. Line break (br) structural helpers must have transparent selection and allow selection for clipboard line breaks
+  assert.match(css, /\.textLayer\s+br\s*\{[^}]*user-select:\s*text;/);
+  assert.match(css, /\.textLayer\s+br\s*\{[^}]*pointer-events:\s*none;/);
+  assert.match(css, /\.textLayer\s+br::selection\s*\{[^}]*background:\s*transparent;/);
+  assert.match(css, /\.textLayer\s+br::-moz-selection\s*\{[^}]*background:\s*transparent;/);
+
+  // 6. Marked content and endOfContent must be transparent; endOfContent expands on selecting
+  assert.match(css, /\.textLayer\s+span\.markedContent::selection\s*\{[^}]*background:\s*transparent;/);
+  assert.match(css, /\.textLayer\s+\.endOfContent\s*\{[^}]*user-select:\s*none;/);
+  assert.match(css, /\.textLayer\s+\.endOfContent::selection\s*\{[^}]*background:\s*transparent;/);
+  assert.match(css, /\.textLayer\.selecting\s+\.endOfContent\s*\{[^}]*top:\s*0;/);
+
+  // 7. Text spans receive Okular selection color strictly
+  assert.match(css, /\.textLayer\s+span::selection\s*\{[^}]*background:\s*rgba\(61,\s*174,\s*233,\s*0\.42\);/);
+});
+
+// ---------------------------------------------------------
+// 15. Selection Diagnostic & Layout Introspection Tests
+// ---------------------------------------------------------
+
+test("Diagnostics: captureSelectionDiagnostic returns structured endpoint, geometry, and styling data", () => {
+  const env = createPdfViewerEnv({ numPages: 2 });
+
+  // 1. Verify build ID is exposed and stamped
+  assert.strictEqual(env.viewer.buildId, "vortex-pdf-20261121.diag7");
+  const modal = env.elements["pdf-viewer-modal"];
+  assert.strictEqual(modal.getAttribute("data-viewer-build"), env.viewer.buildId);
+
+  // 2. Closed / empty selection returns safe baseline object
+  const emptyDiag = env.viewer.captureSelectionDiagnostic();
+  assert.strictEqual(emptyDiag.buildId, env.viewer.buildId);
+  assert.strictEqual(emptyDiag.selection.isCollapsed, true);
+  assert.ok(emptyDiag.environment);
+  assert.strictEqual(Array.isArray(emptyDiag.ranges), true);
+  assert.strictEqual(Array.isArray(emptyDiag.pages), true);
+  assert.strictEqual(Array.isArray(emptyDiag.intersectedNodes), true);
+  assert.ok(emptyDiag.dragTrace);
+  assert.strictEqual(emptyDiag.dragTrace.enabled, false);
+  assert.strictEqual(emptyDiag.dragTrace.eventCount, 0);
+  assert.strictEqual(Array.isArray(emptyDiag.dragTrace.events), true);
+
+  // 2b. Drag trace API toggle
+  assert.strictEqual(env.viewer.enableDragTrace(true), true);
+  assert.strictEqual(env.viewer.isDragTraceEnabled(), true);
+  assert.strictEqual(env.viewer.getDragTrace().length, 0);
+  env.viewer.enableDragTrace(false);
+  assert.strictEqual(env.viewer.isDragTraceEnabled(), false);
+
+  // 3. Open viewer and simulate active DOM selection
+  env.simulateOpen();
+
+  const fakeSpan = {
+    nodeType: 1,
+    nodeName: "SPAN",
+    tagName: "SPAN",
+    className: "",
+    textContent: "• Third bulleted point to finish",
+    attributes: [{ name: "role", value: "presentation" }],
+    getBoundingClientRect: () => ({ left: 50, top: 200, right: 250, bottom: 214, width: 200, height: 14 }),
+    getClientRects: () => [{ left: 50, top: 200, right: 250, bottom: 214, width: 200, height: 14 }],
+    firstChild: {
+      nodeType: 3,
+      nodeName: "#text",
+      textContent: "• Third bulleted point to finish",
+      parentElement: null
+    },
+    parentElement: null,
+    contains: () => true
+  };
+  fakeSpan.firstChild.parentElement = fakeSpan;
+
+  const fakePageWrapper = {
+    nodeType: 1,
+    tagName: "DIV",
+    className: "pdf-page-wrapper",
+    classList: { contains: (c) => c === "pdf-page-wrapper" },
+    getAttribute: (attr) => attr === "data-page-num" ? "1" : null,
+    dataset: { pageNum: "1" },
+    getBoundingClientRect: () => ({ left: 10, top: 10, right: 622, bottom: 802, width: 612, height: 792 }),
+    parentElement: null
+  };
+  fakeSpan.parentElement = fakePageWrapper;
+
+  const fakeRange = {
+    startContainer: fakeSpan.firstChild,
+    startOffset: 0,
+    endContainer: fakeSpan.firstChild,
+    endOffset: 1, // Only select the bullet "•"
+    collapsed: false,
+    getBoundingClientRect: () => ({ left: 50, top: 200, right: 60, bottom: 214, width: 10, height: 14 }),
+    getClientRects: () => [{ left: 50, top: 200, right: 60, bottom: 214, width: 10, height: 14 }],
+    intersectsNode: (node) => node === fakeSpan || node === fakeSpan.firstChild
+  };
+
+  env.window.getSelection = () => ({
+    isCollapsed: false,
+    rangeCount: 1,
+    type: "Range",
+    anchorNode: fakeSpan.firstChild,
+    anchorOffset: 0,
+    focusNode: fakeSpan.firstChild,
+    focusOffset: 1,
+    toString: () => "•",
+    getRangeAt: () => fakeRange
+  });
+
+  const activeDiag = env.viewer.captureSelectionDiagnostic();
+  assert.strictEqual(activeDiag.buildId, env.viewer.buildId);
+  assert.strictEqual(activeDiag.selection.status, "active");
+  assert.strictEqual(activeDiag.selection.selectedText, "•");
+  assert.strictEqual(activeDiag.selection.anchorOffset, 0);
+  assert.strictEqual(activeDiag.selection.focusOffset, 1);
+  assert.strictEqual(activeDiag.selection.anchorNode.parentTagName, "SPAN");
+  assert.strictEqual(activeDiag.selection.anchorNode.parentClassName, "");
+  assert.strictEqual(activeDiag.selection.anchorNode.grandparentTagName, "DIV");
+  assert.strictEqual(activeDiag.selection.anchorNode.grandparentClassName, "pdf-page-wrapper");
+  assert.strictEqual(activeDiag.ranges.length, 1);
+  assert.strictEqual(activeDiag.ranges[0].startOffset, 0);
+  assert.strictEqual(activeDiag.ranges[0].endOffset, 1);
+  assert.ok(activeDiag.ranges[0].boundingClientRect);
+  assert.strictEqual(activeDiag.ranges[0].boundingClientRect.left, 50);
+
+  // 3b. Verify extended endpoint details (endpoint span, offset, character boundaries)
+  assert.ok(activeDiag.selection.endpointDetails);
+  assert.strictEqual(activeDiag.selection.endpointDetails.fullLength, 32);
+  assert.strictEqual(activeDiag.selection.endpointDetails.focusOffset, 1);
+  assert.strictEqual(activeDiag.selection.endpointDetails.isAtTextEnd, false);
+  assert.strictEqual(activeDiag.selection.endpointDetails.characterBeforeOffset, "•");
+  assert.ok(activeDiag.selection.endpointDetails.spanRect);
+  assert.strictEqual(activeDiag.selection.endpointDetails.spanRect.width, 200);
+
+  // 4. Test export method
+  const exported = env.viewer.exportSelectionDiagnostic();
+  assert.strictEqual(exported.buildId, env.viewer.buildId);
+  assert.strictEqual(exported.selection.selectedText, "•");
+
+  env.viewer.close();
+});
+
+// ---------------------------------------------------------
+// 16. Selection Stability, Selecting Class, & Drag Trace
+// ---------------------------------------------------------
+
+test("Selection Drag Lifecycle: Selecting class toggles on viewport, bounds cached, and trace records events", () => {
+  const env = createPdfViewerEnv({ numPages: 2 });
+  env.simulateOpen();
+
+  const viewport = env.elements["pdf-viewport"];
+  const pagesContainer = env.elements["pdf-container"];
+  assert.ok(viewport);
+  assert.ok(pagesContainer);
+
+  // 1. Initially viewport does not have selecting class
+  assert.strictEqual(viewport.classList.contains("selecting"), false);
+
+  // 2. Enable drag trace
+  assert.strictEqual(env.viewer.enableDragTrace(true), true);
+  assert.strictEqual(env.viewer.isDragTraceEnabled(), true);
+
+  // 3. Dispatch mousedown on pagesContainer
+  pagesContainer.dispatchEvent({
+    type: "mousedown",
+    button: 0,
+    clientX: 100,
+    clientY: 150,
+    target: pagesContainer,
+    bubbles: true
+  });
+
+  // Viewport should now have 'selecting' class
+  assert.strictEqual(viewport.classList.contains("selecting"), true);
+
+  // 4. Drag trace should have recorded mousedown
+  const trace1 = env.viewer.getDragTrace();
+  assert.strictEqual(trace1.length, 1);
+  assert.strictEqual(trace1[0].type, "mousedown");
+  assert.strictEqual(trace1[0].pointer.x, 100);
+  assert.strictEqual(trace1[0].pointer.y, 150);
+  assert.strictEqual(trace1[0].isSelecting, true);
+
+  // 5. Dispatch mousemove with button pressed
+  (env.listeners["mousemove"] || []).forEach(fn => fn({
+    buttons: 1,
+    clientX: 120,
+    clientY: 160
+  }));
+
+  const trace2 = env.viewer.getDragTrace();
+  assert.strictEqual(trace2.length, 2);
+  assert.strictEqual(trace2[1].type, "mousemove");
+  assert.strictEqual(trace2[1].pointer.x, 120);
+  assert.strictEqual(trace2[1].pointer.y, 160);
+
+  // 6. Dispatch mouseup
+  (env.listeners["mouseup"] || []).forEach(fn => fn({
+    button: 0,
+    clientX: 150,
+    clientY: 160
+  }));
+
+  // Selecting class should be removed on mouseup
+  assert.strictEqual(viewport.classList.contains("selecting"), false);
+
+  const trace3 = env.viewer.getDragTrace();
+  assert.strictEqual(trace3.length, 3);
+  assert.strictEqual(trace3[2].type, "mouseup");
+
+  // 7. Ring buffer limits test: record over 50 events
+  for (let i = 0; i < 60; i++) {
+    (env.listeners["mousemove"] || []).forEach(fn => fn({
+      buttons: 1,
+      clientX: 100 + i,
+      clientY: 150
+    }));
+  }
+  const traceBounded = env.viewer.getDragTrace();
+  assert.ok(traceBounded.length <= 50, `Ring buffer must be bounded to 50, got ${traceBounded.length}`);
+
+  env.viewer.close();
 });
 
